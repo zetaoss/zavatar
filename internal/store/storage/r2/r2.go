@@ -46,6 +46,7 @@ func New(ctx context.Context, c Config) (*Storage, error) {
 	if c.SecretKey == "" {
 		return nil, fmt.Errorf("r2: missing secret key")
 	}
+	// c.Prefix can be empty
 	if c.PublicBase == "" {
 		return nil, fmt.Errorf("r2: missing public base")
 	}

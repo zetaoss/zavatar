@@ -110,9 +110,7 @@ func validate(cfg Config) error {
 		if r2.SecretKey == "" {
 			return fmt.Errorf("r2: missing R2_SECRET_KEY")
 		}
-		if r2.Prefix == "" {
-			return fmt.Errorf("r2: missing R2_PREFIX")
-		}
+		// r2.Prefix can be empty
 		if r2.PublicBase == "" {
 			return fmt.Errorf("r2: missing R2_PUBLIC_BASE")
 		}
