@@ -14,12 +14,12 @@ func wireStorage(ctx context.Context, sc config.StorageConfig) (storagestore.Sto
 	switch sc.Driver {
 	case "r2":
 		return r2storage.New(ctx, r2storage.Config{
-			AccountID:       sc.R2.AccountID,
-			Bucket:          sc.R2.Bucket,
-			AccessKeyID:     sc.R2.AccessKeyID,
-			SecretAccessKey: sc.R2.SecretAccessKey,
-			Prefix:          sc.R2.Prefix,
-			PublicBase:      sc.R2.PublicBase,
+			AccountID:  sc.R2.AccountID,
+			Bucket:     sc.R2.Bucket,
+			AccessKey:  sc.R2.AccessKey,
+			SecretKey:  sc.R2.SecretKey,
+			Prefix:     sc.R2.Prefix,
+			PublicBase: sc.R2.PublicBase,
 		})
 
 	default: // file

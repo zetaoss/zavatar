@@ -18,12 +18,12 @@ import (
 )
 
 type Config struct {
-	AccountID       string
-	Bucket          string
-	AccessKeyID     string
-	SecretAccessKey string
-	Prefix          string
-	PublicBase      string
+	AccountID  string
+	Bucket     string
+	AccessKey  string
+	SecretKey  string
+	Prefix     string
+	PublicBase string
 }
 
 type Storage struct {
@@ -34,8 +34,20 @@ type Storage struct {
 }
 
 func New(ctx context.Context, c Config) (*Storage, error) {
-	if c.AccountID == "" || c.Bucket == "" || c.AccessKeyID == "" || c.SecretAccessKey == "" {
-		return nil, fmt.Errorf("r2: missing required config")
+	if c.AccountID == "" {
+		return nil, fmt.Errorf("r2: missing account id")
+	}
+	if c.Bucket == "" {
+		return nil, fmt.Errorf("r2: missing bucket")
+	}
+	if c.AccessKey == "" {
+		return nil, fmt.Errorf("r2: missing access key")
+	}
+	if c.SecretKey == "" {
+		return nil, fmt.Errorf("r2: missing secret key")
+	}
+	if c.PublicBase == "" {
+		return nil, fmt.Errorf("r2: missing public base")
 	}
 
 	endpoint := fmt.Sprintf("https://%s.r2.cloudflarestorage.com", c.AccountID)
@@ -45,7 +57,7 @@ func New(ctx context.Context, c Config) (*Storage, error) {
 
 	awsCfg, err := config.LoadDefaultConfig(ctx,
 		config.WithRegion("auto"),
-		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(c.AccessKeyID, c.SecretAccessKey, "")),
+		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(c.AccessKey, c.SecretKey, "")),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("r2: load aws config: %w", err)
