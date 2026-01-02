@@ -30,7 +30,7 @@ type DBConfig struct {
 type MySQLConfig struct {
 	Host     string
 	Port     int
-	User     string
+	Username string
 	Password string
 	Database string
 }

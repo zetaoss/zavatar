@@ -6,10 +6,10 @@ import (
 	mysqlDriver "github.com/go-sql-driver/mysql"
 )
 
-func formatDSN(user, pass, host string, port int, dbname string) string {
+func formatDSN(user, passwd, host string, port int, dbname string) string {
 	cfg := mysqlDriver.Config{
 		User:      user,
-		Passwd:    pass,
+		Passwd:    passwd,
 		Net:       "tcp",
 		Addr:      fmt.Sprintf("%s:%d", host, port),
 		DBName:    dbname,

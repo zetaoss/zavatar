@@ -14,7 +14,7 @@ func wireDB(cfg config.DBConfig) (db.DB, error) {
 		return mysql.New(mysql.Config{
 			Host:     cfg.MySQL.Host,
 			Port:     cfg.MySQL.Port,
-			User:     cfg.MySQL.User,
+			Username: cfg.MySQL.Username,
 			Password: cfg.MySQL.Password,
 			Database: cfg.MySQL.Database,
 		})

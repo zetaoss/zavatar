@@ -70,7 +70,7 @@ func Load(args []string) (Config, error) {
 			MySQL: MySQLConfig{
 				Host:     strings.TrimSpace(*mysqlHost),
 				Port:     *mysqlPort,
-				User:     strings.TrimSpace(*mysqlUser),
+				Username: strings.TrimSpace(*mysqlUser),
 				Password: strings.TrimSpace(*mysqlPass),
 				Database: strings.TrimSpace(*mysqlName),
 			},
@@ -116,11 +116,20 @@ func validate(cfg Config) error {
 		return nil
 	case "mysql":
 		m := cfg.DB.MySQL
-		if m.Host == "" || m.User == "" || m.Database == "" {
-			return fmt.Errorf("mysql: missing required config (host/user/database)")
+		if m.Host == "" {
+			return fmt.Errorf("mysql: missing required config host")
 		}
 		if m.Port == 0 {
-			return fmt.Errorf("mysql: missing port")
+			return fmt.Errorf("mysql: missing required config port")
+		}
+		if m.Username == "" {
+			return fmt.Errorf("mysql: missing required config username")
+		}
+		if m.Password == "" {
+			return fmt.Errorf("mysql: missing required config password")
+		}
+		if m.Database == "" {
+			return fmt.Errorf("mysql: missing required config database")
 		}
 		return nil
 	default:
