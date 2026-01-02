@@ -11,13 +11,7 @@ type Config struct {
 
 type StoreConfig struct {
 	Driver string // "file" | "r2"
-	File   FileStoreConfig
 	R2     R2StoreConfig
-}
-
-type FileStoreConfig struct {
-	DataDir    string // default "./data"
-	PublicBase string // default "http://localhost:8080"
 }
 
 type R2StoreConfig struct {

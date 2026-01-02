@@ -44,13 +44,13 @@ func (s *AvatarService) Resolve(ctx context.Context, in ResolveInput) (*ResolveO
 		p = &domain.UserProfile{Name: fmt.Sprintf("u%d", in.UserID), Type: "identicon"}
 	}
 
-	// gravatar: R2 저장 없이 외부 redirect
+	// gravatar: redirect
 	if p.Type == "gravatar" && p.GHash != "" {
 		u := render.GravatarURL(p.GHash, in.Size)
 		return &ResolveOutput{RedirectURL: u}, nil
 	}
 
-	// letter: SVG 단일 파일 (size 무시)
+	// letter: SVG
 	if p.Type == "letter" {
 		key := domain.KeyLetterSVG(in.V, in.UserID)
 		exists, _ := s.obj.Exists(ctx, key)
@@ -61,7 +61,7 @@ func (s *AvatarService) Resolve(ctx context.Context, in ResolveInput) (*ResolveO
 		return &ResolveOutput{RedirectURL: s.obj.PublicURL(key)}, nil
 	}
 
-	// identicon: PNG size별
+	// identicon: PNG
 	key := domain.KeyPNG(in.V, in.UserID, in.Size)
 	exists, _ := s.obj.Exists(ctx, key)
 	if exists {

@@ -11,8 +11,6 @@ import (
 func Load(args []string) (Config, error) {
 	fs := flag.NewFlagSet("zavatar", flag.ContinueOnError)
 
-	dev := fs.Bool("dev", false, "developer mode (store=file, db=memory)")
-
 	addr := fs.String("addr", "", "listen address (env: ADDR), e.g. :8080")
 
 	store := fs.String("store", "", "store driver override: file|r2 (env: STORE)")
@@ -31,14 +29,9 @@ func Load(args []string) (Config, error) {
 	}
 
 	cfg := Config{
-		Dev:  *dev,
 		Addr: firstNonEmpty(*addr, os.Getenv("ADDR"), ":8080"),
 		Store: StoreConfig{
 			Driver: firstNonEmpty(*store, os.Getenv("STORE")),
-			File: FileStoreConfig{
-				DataDir:    firstNonEmpty(os.Getenv("FILE_DATA_DIR"), "./data"),
-				PublicBase: firstNonEmpty(os.Getenv("FILE_PUBLIC_BASE"), "http://localhost:8080"),
-			},
 			R2: R2StoreConfig{
 				AccountID:       firstNonEmpty(*r2AccountID, os.Getenv("R2_ACCOUNT_ID")),
 				Bucket:          firstNonEmpty(*r2Bucket, os.Getenv("R2_BUCKET")),
@@ -55,15 +48,9 @@ func Load(args []string) (Config, error) {
 
 	// defaults (after env/flag)
 	if cfg.Store.Driver == "" {
-		cfg.Store.Driver = "r2"
+		cfg.Store.Driver = "file"
 	}
 	if cfg.DB.Driver == "" {
-		cfg.DB.Driver = "mariadb"
-	}
-
-	// dev mode overrides
-	if cfg.Dev {
-		cfg.Store.Driver = "file"
 		cfg.DB.Driver = "memory"
 	}
 
@@ -76,12 +63,10 @@ func Load(args []string) (Config, error) {
 }
 
 func normalize(cfg *Config) {
-	// prefix 정규화
 	if p := strings.TrimSpace(cfg.Store.R2.Prefix); p != "" && !strings.HasSuffix(p, "/") {
 		cfg.Store.R2.Prefix = p + "/"
 	}
 	cfg.Store.R2.PublicBase = strings.TrimRight(strings.TrimSpace(cfg.Store.R2.PublicBase), "/")
-	cfg.Store.File.PublicBase = strings.TrimRight(strings.TrimSpace(cfg.Store.File.PublicBase), "/")
 }
 
 func validate(cfg Config) error {

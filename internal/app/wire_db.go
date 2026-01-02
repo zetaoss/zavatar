@@ -10,13 +10,10 @@ import (
 
 func wireDB(cfg config.DBConfig) (profile.Store, error) {
 	switch cfg.Driver {
-	case "memory":
-		return profilemem.New(), nil
-
 	case "mariadb":
 		return nil, fmt.Errorf("db=mariadb not implemented yet")
 
-	default:
-		return nil, fmt.Errorf("invalid db driver: %q", cfg.Driver)
+	default: // memory
+		return profilemem.New(), nil
 	}
 }
