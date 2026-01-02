@@ -4,32 +4,45 @@ name: pull request
 on:
   pull_request:
 
+concurrency:
+  group: pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
-  checks:
+  test:
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
           cache: true
+      - name: test
+        run: make test
 
-      - name: checks
-        run: make checks
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: lint
+        run: make lint
 
   docker-build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-      
     steps:
       - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
       - uses: docker/build-push-action@v6
         with:
           context: .
           push: false
           build-args: |
             VERSION=development
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
