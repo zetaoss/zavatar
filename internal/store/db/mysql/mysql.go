@@ -6,8 +6,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
 
-	_ "github.com/go-sql-driver/mysql"
 	"github.com/zetaoss/zavatar/internal/domain"
 )
 
@@ -25,19 +25,16 @@ type Config struct {
 }
 
 func New(cfg Config) (*DB, error) {
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?%s",
-		cfg.User,
-		cfg.Password,
-		cfg.Host,
-		cfg.Port,
-		cfg.Database,
-		"parseTime=true&charset=utf8mb4",
-	)
+	dsn := formatDSN(cfg.User, cfg.Password, cfg.Host, cfg.Port, cfg.Database)
 
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {
 		return nil, err
 	}
+
+	db.SetMaxOpenConns(10)
+	db.SetMaxIdleConns(5)
+	db.SetConnMaxLifetime(30 * time.Minute)
 
 	if err := db.Ping(); err != nil {
 		_ = db.Close()
@@ -46,7 +43,6 @@ func New(cfg Config) (*DB, error) {
 
 	return &DB{db: db}, nil
 }
-
 func (d *DB) Close() error {
 	return d.db.Close()
 }

@@ -8,9 +8,7 @@ import (
 
 	"github.com/zetaoss/zavatar/internal/domain"
 	"github.com/zetaoss/zavatar/internal/render"
-	"github.com/zetaoss/zavatar/internal/store/db"
 	dbstore "github.com/zetaoss/zavatar/internal/store/db"
-	"github.com/zetaoss/zavatar/internal/store/storage"
 	storagestore "github.com/zetaoss/zavatar/internal/store/storage"
 )
 
@@ -19,7 +17,7 @@ type AvatarService struct {
 	db      dbstore.DB
 }
 
-func NewAvatarService(storage storage.Storage, db db.DB) *AvatarService {
+func NewAvatarService(storage storagestore.Storage, db dbstore.DB) *AvatarService {
 	return &AvatarService{storage, db}
 }
 

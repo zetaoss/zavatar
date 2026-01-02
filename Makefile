@@ -51,3 +51,12 @@ lint-install:
 			| sh -s -- -b ./bin $(GOLANGCI_LINT_VERSION); \
 		echo "▶ installed: $$(./bin/golangci-lint version)"; \
 	fi
+
+.PHONY: test
+test:
+	@echo "▶ go test"
+	@go test -v ./...
+
+.PHONY: checks
+checks: test lint
+	@echo "▶ all checks passed"

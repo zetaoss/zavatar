@@ -4,7 +4,7 @@ package app
 import (
 	"github.com/zetaoss/zavatar/internal/config"
 	"github.com/zetaoss/zavatar/internal/store/db"
-	"github.com/zetaoss/zavatar/internal/store/db/memory"
+	"github.com/zetaoss/zavatar/internal/store/db/fake"
 	"github.com/zetaoss/zavatar/internal/store/db/mysql"
 )
 
@@ -19,7 +19,7 @@ func wireDB(cfg config.DBConfig) (db.DB, error) {
 			Database: cfg.MySQL.Database,
 		})
 
-	default: // memory
-		return memory.New(), nil
+	default: // fake
+		return fake.New(), nil
 	}
 }

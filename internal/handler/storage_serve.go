@@ -3,6 +3,7 @@ package handler
 
 import (
 	"io"
+	"log"
 	"net/http"
 	"strings"
 
@@ -29,7 +30,11 @@ func (h *R2ServeHandler) Serve(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	defer rc.Close()
+	defer func() {
+		if err := rc.Close(); err != nil {
+			log.Printf("failed to close reader: %v", err)
+		}
+	}()
 
 	if ct == "" {
 		ct = "application/octet-stream"

@@ -1,5 +1,5 @@
-// internal/DB/db/memory/memory.go
-package memory
+// internal/DB/db/fake/fake.go
+package fake
 
 import (
 	"context"

@@ -1,7 +1,9 @@
+// internal/store/db/mysql/mysql_test.go
 package mysql
 
 import (
 	"context"
+	"fmt"
 	"regexp"
 	"testing"
 
@@ -26,7 +28,8 @@ func TestMapProfileType(t *testing.T) {
 
 	for _, tc := range cases {
 		tc := tc
-		t.Run(regexp.QuoteMeta(string(rune(tc.in))), func(t *testing.T) {
+		t.Run(fmt.Sprintf("t=%d", tc.in), func(t *testing.T) {
+			t.Parallel()
 			require.Equal(t, tc.want, mapProfileType(tc.in))
 		})
 	}
