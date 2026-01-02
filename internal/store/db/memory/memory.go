@@ -1,4 +1,4 @@
-// internal/storage/profile/memory/memory.go
+// internal/DB/db/memory/memory.go
 package memory
 
 import (
@@ -10,11 +10,11 @@ import (
 	"github.com/zetaoss/zavatar/internal/domain"
 )
 
-type Store struct{}
+type DB struct{}
 
-func New() *Store { return &Store{} }
+func New() *DB { return &DB{} }
 
-func (r *Store) Get(ctx context.Context, userID int64) (*domain.UserProfile, error) {
+func (d *DB) Get(ctx context.Context, userID int64) (*domain.UserProfile, error) {
 	switch userID % 3 {
 	case 0:
 		return &domain.UserProfile{
@@ -24,7 +24,7 @@ func (r *Store) Get(ctx context.Context, userID int64) (*domain.UserProfile, err
 		}, nil
 	case 1:
 		return &domain.UserProfile{
-			Name: "Jmnote",
+			Name: "Testuser",
 			Type: "letter",
 		}, nil
 	default:
@@ -33,6 +33,10 @@ func (r *Store) Get(ctx context.Context, userID int64) (*domain.UserProfile, err
 			Type: "identicon",
 		}, nil
 	}
+}
+
+func (d *DB) Close() error {
+	return nil
 }
 
 func fake32(s string) string {

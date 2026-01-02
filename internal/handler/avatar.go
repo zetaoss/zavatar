@@ -29,17 +29,9 @@ func (h *AvatarHandler) GetAvatar(w http.ResponseWriter, r *http.Request) {
 
 	size := domain.NormalizeSize(r.URL.Query().Get("s"))
 
-	v := 1
-	if qs := r.URL.Query().Get("v"); qs != "" {
-		if n, err := strconv.Atoi(qs); err == nil && n > 0 && n < 100000 {
-			v = n
-		}
-	}
-
 	out, err := h.svc.Resolve(r.Context(), service.ResolveInput{
 		UserID: uid,
 		Size:   size,
-		V:      v,
 	})
 	if err != nil {
 		http.Error(w, "resolve failed", http.StatusInternalServerError)

@@ -31,7 +31,7 @@ func Run(c Config) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	obj, err := wireStore(ctx, cfg.Store)
+	obj, err := wireStorage(ctx, cfg.Storage)
 	if err != nil {
 		return err
 	}

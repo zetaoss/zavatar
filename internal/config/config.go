@@ -2,28 +2,35 @@
 package config
 
 type Config struct {
-	Dev  bool
 	Addr string
 
-	Store StoreConfig
-	DB    DBConfig
+	Storage StorageConfig
+	DB      DBConfig
 }
 
-type StoreConfig struct {
-	Driver string // "file" | "r2"
-	R2     R2StoreConfig
+type StorageConfig struct {
+	Driver string // filesystem | r2
+	R2     R2Config
 }
 
-type R2StoreConfig struct {
+type R2Config struct {
 	AccountID       string
 	Bucket          string
 	AccessKeyID     string
 	SecretAccessKey string
 	Prefix          string
-	PublicBase      string // required for redirect
+	PublicBase      string
 }
 
 type DBConfig struct {
-	Driver string // "memory" | "mariadb"
-	// MariaDB settings later...
+	Driver string // memory | mysql
+	MySQL  MySQLConfig
+}
+
+type MySQLConfig struct {
+	Host     string
+	Port     int
+	User     string
+	Password string
+	Database string
 }

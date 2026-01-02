@@ -1,4 +1,4 @@
-// internal/handler/object_serve.go
+// internal/handler/storage_serve.go
 package handler
 
 import (
@@ -6,15 +6,15 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/zetaoss/zavatar/internal/storage/object"
+	storagestore "github.com/zetaoss/zavatar/internal/store/storage"
 )
 
 type R2ServeHandler struct {
-	obj object.Store
+	storage storagestore.Storage
 }
 
-func NewR2ServeHandler(obj object.Store) *R2ServeHandler {
-	return &R2ServeHandler{obj: obj}
+func NewR2ServeHandler(storage storagestore.Storage) *R2ServeHandler {
+	return &R2ServeHandler{storage}
 }
 
 func (h *R2ServeHandler) Serve(w http.ResponseWriter, r *http.Request) {
@@ -24,7 +24,7 @@ func (h *R2ServeHandler) Serve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rc, ct, err := h.obj.Get(r.Context(), key)
+	rc, ct, err := h.storage.Get(r.Context(), key)
 	if err != nil {
 		http.NotFound(w, r)
 		return

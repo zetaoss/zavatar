@@ -1,5 +1,5 @@
-// internal/storage/object/fs/fs.go
-package fs
+// internal/storage/filesystem/filesystem.go
+package filesystem
 
 import (
 	"context"
@@ -14,18 +14,18 @@ const (
 	prefix     = "data/"
 )
 
-type Store struct{}
+type Storage struct{}
 
-func New() *Store {
+func New() *Storage {
 	_ = os.MkdirAll(dataDir, 0755)
-	return &Store{}
+	return &Storage{}
 }
 
-func (s *Store) path(key string) string {
+func (s *Storage) path(key string) string {
 	return filepath.Join(dataDir, key)
 }
 
-func (s *Store) Exists(ctx context.Context, key string) (bool, error) {
+func (s *Storage) Exists(ctx context.Context, key string) (bool, error) {
 	_, err := os.Stat(s.path(key))
 	if err == nil {
 		return true, nil
@@ -36,7 +36,7 @@ func (s *Store) Exists(ctx context.Context, key string) (bool, error) {
 	return false, err
 }
 
-func (s *Store) Get(ctx context.Context, key string) (io.ReadCloser, string, error) {
+func (s *Storage) Get(ctx context.Context, key string) (io.ReadCloser, string, error) {
 	f, err := os.Open(s.path(key))
 	if err != nil {
 		return nil, "", err
@@ -44,7 +44,7 @@ func (s *Store) Get(ctx context.Context, key string) (io.ReadCloser, string, err
 	return f, "", nil
 }
 
-func (s *Store) Put(ctx context.Context, key string, contentType string, body []byte) error {
+func (s *Storage) Put(ctx context.Context, key string, contentType string, body []byte) error {
 	path := s.path(key)
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return err
@@ -52,6 +52,6 @@ func (s *Store) Put(ctx context.Context, key string, contentType string, body []
 	return os.WriteFile(path, body, 0644)
 }
 
-func (s *Store) PublicURL(key string) string {
+func (s *Storage) PublicURL(key string) string {
 	return publicBase + "/" + prefix + key
 }

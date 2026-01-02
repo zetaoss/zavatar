@@ -8,23 +8,24 @@ import (
 
 	"github.com/zetaoss/zavatar/internal/domain"
 	"github.com/zetaoss/zavatar/internal/render"
-	"github.com/zetaoss/zavatar/internal/storage/object"
-	"github.com/zetaoss/zavatar/internal/storage/profile"
+	"github.com/zetaoss/zavatar/internal/store/db"
+	dbstore "github.com/zetaoss/zavatar/internal/store/db"
+	"github.com/zetaoss/zavatar/internal/store/storage"
+	storagestore "github.com/zetaoss/zavatar/internal/store/storage"
 )
 
 type AvatarService struct {
-	obj   object.Store
-	users profile.Store
+	storage storagestore.Storage
+	db      dbstore.DB
 }
 
-func NewAvatarService(obj object.Store, users profile.Store) *AvatarService {
-	return &AvatarService{obj: obj, users: users}
+func NewAvatarService(storage storage.Storage, db db.DB) *AvatarService {
+	return &AvatarService{storage, db}
 }
 
 type ResolveInput struct {
 	UserID int64
 	Size   int
-	V      int
 }
 
 type ResolveOutput struct {
@@ -35,11 +36,8 @@ func (s *AvatarService) Resolve(ctx context.Context, in ResolveInput) (*ResolveO
 	if in.UserID <= 0 {
 		return nil, fmt.Errorf("bad user_id")
 	}
-	if in.V <= 0 {
-		in.V = 1
-	}
 
-	p, err := s.users.Get(ctx, in.UserID)
+	p, err := s.db.Get(ctx, in.UserID)
 	if err != nil || p == nil {
 		p = &domain.UserProfile{Name: fmt.Sprintf("u%d", in.UserID), Type: "identicon"}
 	}
@@ -52,20 +50,20 @@ func (s *AvatarService) Resolve(ctx context.Context, in ResolveInput) (*ResolveO
 
 	// letter: SVG
 	if p.Type == "letter" {
-		key := domain.KeyLetterSVG(in.V, in.UserID)
-		exists, _ := s.obj.Exists(ctx, key)
+		key := domain.KeyLetterSVG(in.UserID)
+		exists, _ := s.storage.Exists(ctx, key)
 		if !exists {
 			body := render.LetterSVG(p.Name)
-			_ = s.obj.Put(ctx, key, "image/svg+xml; charset=utf-8", body)
+			_ = s.storage.Put(ctx, key, "image/svg+xml; charset=utf-8", body)
 		}
-		return &ResolveOutput{RedirectURL: s.obj.PublicURL(key)}, nil
+		return &ResolveOutput{RedirectURL: s.storage.PublicURL(key)}, nil
 	}
 
 	// identicon: PNG
-	key := domain.KeyPNG(in.V, in.UserID, in.Size)
-	exists, _ := s.obj.Exists(ctx, key)
+	key := domain.KeyPNG(in.UserID, in.Size)
+	exists, _ := s.storage.Exists(ctx, key)
 	if exists {
-		return &ResolveOutput{RedirectURL: s.obj.PublicURL(key)}, nil
+		return &ResolveOutput{RedirectURL: s.storage.PublicURL(key)}, nil
 	}
 
 	seed := "u:" + strconv.FormatInt(in.UserID, 10) + ":" + p.Name
@@ -73,7 +71,7 @@ func (s *AvatarService) Resolve(ctx context.Context, in ResolveInput) (*ResolveO
 	if err != nil {
 		return nil, err
 	}
-	_ = s.obj.Put(ctx, key, "image/png", pngBytes)
+	_ = s.storage.Put(ctx, key, "image/png", pngBytes)
 
-	return &ResolveOutput{RedirectURL: s.obj.PublicURL(key)}, nil
+	return &ResolveOutput{RedirectURL: s.storage.PublicURL(key)}, nil
 }

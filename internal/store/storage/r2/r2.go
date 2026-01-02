@@ -1,4 +1,4 @@
-// internal/storage/object/r2/r2.go
+// internal/store/storage/r2/r2.go
 package r2
 
 import (
@@ -26,14 +26,14 @@ type Config struct {
 	PublicBase      string
 }
 
-type Store struct {
+type Storage struct {
 	bucket     string
 	prefix     string
 	publicBase string
 	s3         *s3.Client
 }
 
-func New(ctx context.Context, c Config) (*Store, error) {
+func New(ctx context.Context, c Config) (*Storage, error) {
 	if c.AccountID == "" || c.Bucket == "" || c.AccessKeyID == "" || c.SecretAccessKey == "" {
 		return nil, fmt.Errorf("r2: missing required config")
 	}
@@ -56,7 +56,7 @@ func New(ctx context.Context, c Config) (*Store, error) {
 		o.UsePathStyle = true
 	})
 
-	return &Store{
+	return &Storage{
 		bucket:     c.Bucket,
 		prefix:     c.Prefix,
 		publicBase: strings.TrimRight(c.PublicBase, "/"),
@@ -64,14 +64,14 @@ func New(ctx context.Context, c Config) (*Store, error) {
 	}, nil
 }
 
-func (s *Store) key(k string) string {
+func (s *Storage) key(k string) string {
 	if s.prefix == "" {
 		return k
 	}
 	return s.prefix + k
 }
 
-func (s *Store) Exists(ctx context.Context, key string) (bool, error) {
+func (s *Storage) Exists(ctx context.Context, key string) (bool, error) {
 	_, err := s.s3.HeadObject(ctx, &s3.HeadObjectInput{
 		Bucket: aws.String(s.bucket),
 		Key:    aws.String(s.key(key)),
@@ -88,7 +88,7 @@ func (s *Store) Exists(ctx context.Context, key string) (bool, error) {
 	return false, err
 }
 
-func (s *Store) Get(ctx context.Context, key string) (io.ReadCloser, string, error) {
+func (s *Storage) Get(ctx context.Context, key string) (io.ReadCloser, string, error) {
 	out, err := s.s3.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(s.bucket),
 		Key:    aws.String(s.key(key)),
@@ -101,7 +101,7 @@ func (s *Store) Get(ctx context.Context, key string) (io.ReadCloser, string, err
 	return out.Body, ct, nil
 }
 
-func (s *Store) Put(ctx context.Context, key string, contentType string, body []byte) error {
+func (s *Storage) Put(ctx context.Context, key string, contentType string, body []byte) error {
 	_, err := s.s3.PutObject(ctx, &s3.PutObjectInput{
 		Bucket:      aws.String(s.bucket),
 		Key:         aws.String(s.key(key)),
@@ -111,7 +111,7 @@ func (s *Store) Put(ctx context.Context, key string, contentType string, body []
 	return err
 }
 
-func (s *Store) PublicURL(key string) string {
+func (s *Storage) PublicURL(key string) string {
 	if s.publicBase == "" {
 		return ""
 	}

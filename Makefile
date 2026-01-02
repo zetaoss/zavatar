@@ -4,16 +4,19 @@ SHELL := /bin/bash
 
 .PHONY: run-dev
 run-dev:
-	@echo "▶ loading .env.example"
-	@set -a; . ./.env.example; set +a; \
-	echo "▶ running (dev)..."; \
+	@echo "▶ running"
 	go run ./cmd/zavatar
-	
-.PHONY: run-r2
-run-r2:
-	@echo "▶ loading .env.r2"
+
+.PHONY: run-dev-r2
+run-dev-r2:
+	@echo "▶ running with .env.r2"
 	@set -a; . ./.env.r2; set +a; \
-	echo "▶ running (r2)..."; \
+	go run ./cmd/zavatar
+
+.PHONY: run-dev-mysql
+run-dev-mysql:
+	@echo "▶ running with .env.mysql"
+	@set -a; . ./.env.mysql; set +a; \
 	go run ./cmd/zavatar
 
 .PHONY: curl
