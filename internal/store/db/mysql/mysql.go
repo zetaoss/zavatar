@@ -18,14 +18,14 @@ type DB struct {
 type Config struct {
 	Host     string
 	Port     int
-	User     string
+	Username string
 	Password string
 	Database string
 	Params   string
 }
 
 func New(cfg Config) (*DB, error) {
-	dsn := formatDSN(cfg.User, cfg.Password, cfg.Host, cfg.Port, cfg.Database)
+	dsn := formatDSN(cfg.Username, cfg.Password, cfg.Host, cfg.Port, cfg.Database)
 
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {
