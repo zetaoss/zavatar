@@ -1,19 +1,25 @@
+// internal/app/wire_db.go
 package app
 
 import (
-	"fmt"
-
 	"github.com/zetaoss/zavatar/internal/config"
-	"github.com/zetaoss/zavatar/internal/storage/profile"
-	profilemem "github.com/zetaoss/zavatar/internal/storage/profile/memory"
+	"github.com/zetaoss/zavatar/internal/store/db"
+	"github.com/zetaoss/zavatar/internal/store/db/fake"
+	"github.com/zetaoss/zavatar/internal/store/db/mysql"
 )
 
-func wireDB(cfg config.DBConfig) (profile.Store, error) {
+func wireDB(cfg config.DBConfig) (db.DB, error) {
 	switch cfg.Driver {
-	case "mariadb":
-		return nil, fmt.Errorf("db=mariadb not implemented yet")
+	case "mysql":
+		return mysql.New(mysql.Config{
+			Host:     cfg.MySQL.Host,
+			Port:     cfg.MySQL.Port,
+			User:     cfg.MySQL.User,
+			Password: cfg.MySQL.Password,
+			Database: cfg.MySQL.Database,
+		})
 
-	default: // memory
-		return profilemem.New(), nil
+	default: // fake
+		return fake.New(), nil
 	}
 }

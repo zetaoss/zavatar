@@ -1,5 +1,5 @@
-// internal/storage/profile/profile.go
-package profile
+// internal/store/db/db.go
+package db
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 	"github.com/zetaoss/zavatar/internal/domain"
 )
 
-type Store interface {
+type DB interface {
 	Get(ctx context.Context, userID int64) (*domain.UserProfile, error)
+	Close() error
 }

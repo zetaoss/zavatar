@@ -4,19 +4,30 @@ package config
 import (
 	"flag"
 	"fmt"
-	"os"
 	"strings"
+
+	"github.com/peterbourgon/ff/v3"
 )
 
 func Load(args []string) (Config, error) {
 	fs := flag.NewFlagSet("zavatar", flag.ContinueOnError)
 
-	addr := fs.String("addr", "", "listen address (env: ADDR), e.g. :8080")
+	// Server
+	addr := fs.String("addr", ":8080", "listen address, e.g. :8080 (env: ADDR)")
 
-	store := fs.String("store", "", "store driver override: file|r2 (env: STORE)")
-	db := fs.String("db", "", "db driver override: memory|mariadb (env: DB)")
+	// Drivers
+	storageDriver := fs.String(
+		"storage-driver",
+		"filesystem",
+		"storage driver: filesystem|r2 (env: STORAGE_DRIVER)",
+	)
+	dbDriver := fs.String(
+		"db-driver",
+		"memory",
+		"db driver: memory|mysql (env: DB_DRIVER)",
+	)
 
-	// R2 overrides
+	// R2
 	r2AccountID := fs.String("r2-account-id", "", "env: R2_ACCOUNT_ID")
 	r2Bucket := fs.String("r2-bucket", "", "env: R2_BUCKET")
 	r2AccessKeyID := fs.String("r2-access-key-id", "", "env: R2_ACCESS_KEY_ID")
@@ -24,82 +35,95 @@ func Load(args []string) (Config, error) {
 	r2Prefix := fs.String("r2-prefix", "", "env: R2_PREFIX")
 	r2PublicBase := fs.String("r2-public-base", "", "env: R2_PUBLIC_BASE")
 
-	if err := fs.Parse(args); err != nil {
+	// MySQL
+	mysqlHost := fs.String("mysql-host", "", "env: MYSQL_HOST")
+	mysqlPort := fs.Int("mysql-port", 3306, "env: MYSQL_PORT")
+	mysqlUser := fs.String("mysql-user", "", "env: MYSQL_USER")
+	mysqlPass := fs.String("mysql-password", "", "env: MYSQL_PASSWORD")
+	mysqlName := fs.String("mysql-database", "", "env: MYSQL_DATABASE")
+	if err := ff.Parse(
+		fs,
+		args,
+		ff.WithEnvVarNoPrefix(),
+		ff.WithEnvVarPrefix(""),
+	); err != nil {
 		return Config{}, err
 	}
 
 	cfg := Config{
-		Addr: firstNonEmpty(*addr, os.Getenv("ADDR"), ":8080"),
-		Store: StoreConfig{
-			Driver: firstNonEmpty(*store, os.Getenv("STORE")),
-			R2: R2StoreConfig{
-				AccountID:       firstNonEmpty(*r2AccountID, os.Getenv("R2_ACCOUNT_ID")),
-				Bucket:          firstNonEmpty(*r2Bucket, os.Getenv("R2_BUCKET")),
-				AccessKeyID:     firstNonEmpty(*r2AccessKeyID, os.Getenv("R2_ACCESS_KEY_ID")),
-				SecretAccessKey: firstNonEmpty(*r2SecretAccessKey, os.Getenv("R2_SECRET_ACCESS_KEY")),
-				Prefix:          firstNonEmpty(*r2Prefix, os.Getenv("R2_PREFIX")),
-				PublicBase:      firstNonEmpty(*r2PublicBase, os.Getenv("R2_PUBLIC_BASE")),
+		Addr: strings.TrimSpace(*addr),
+
+		Storage: StorageConfig{
+			Driver: strings.TrimSpace(*storageDriver),
+			R2: R2Config{
+				AccountID:       strings.TrimSpace(*r2AccountID),
+				Bucket:          strings.TrimSpace(*r2Bucket),
+				AccessKeyID:     strings.TrimSpace(*r2AccessKeyID),
+				SecretAccessKey: strings.TrimSpace(*r2SecretAccessKey),
+				Prefix:          strings.TrimSpace(*r2Prefix),
+				PublicBase:      strings.TrimSpace(*r2PublicBase),
 			},
 		},
-		DB: DBConfig{
-			Driver: firstNonEmpty(*db, os.Getenv("DB")),
-		},
-	}
 
-	// defaults (after env/flag)
-	if cfg.Store.Driver == "" {
-		cfg.Store.Driver = "file"
-	}
-	if cfg.DB.Driver == "" {
-		cfg.DB.Driver = "memory"
+		DB: DBConfig{
+			Driver: strings.TrimSpace(*dbDriver),
+			MySQL: MySQLConfig{
+				Host:     strings.TrimSpace(*mysqlHost),
+				Port:     *mysqlPort,
+				User:     strings.TrimSpace(*mysqlUser),
+				Password: strings.TrimSpace(*mysqlPass),
+				Database: strings.TrimSpace(*mysqlName),
+			},
+		},
 	}
 
 	normalize(&cfg)
 	if err := validate(cfg); err != nil {
 		return Config{}, err
 	}
-
 	return cfg, nil
 }
 
 func normalize(cfg *Config) {
-	if p := strings.TrimSpace(cfg.Store.R2.Prefix); p != "" && !strings.HasSuffix(p, "/") {
-		cfg.Store.R2.Prefix = p + "/"
+	if p := strings.TrimSpace(cfg.Storage.R2.Prefix); p != "" && !strings.HasSuffix(p, "/") {
+		cfg.Storage.R2.Prefix = p + "/"
 	}
-	cfg.Store.R2.PublicBase = strings.TrimRight(strings.TrimSpace(cfg.Store.R2.PublicBase), "/")
+	cfg.Storage.R2.PublicBase =
+		strings.TrimRight(strings.TrimSpace(cfg.Storage.R2.PublicBase), "/")
 }
 
 func validate(cfg Config) error {
-	switch cfg.Store.Driver {
-	case "file":
+	switch cfg.Storage.Driver {
+	case "filesystem":
 		// ok
 	case "r2":
-		r2 := cfg.Store.R2
-		if r2.AccountID == "" || r2.Bucket == "" || r2.AccessKeyID == "" || r2.SecretAccessKey == "" {
+		r2 := cfg.Storage.R2
+		if r2.AccountID == "" ||
+			r2.Bucket == "" ||
+			r2.AccessKeyID == "" ||
+			r2.SecretAccessKey == "" {
 			return fmt.Errorf("r2: missing required config (account/bucket/access/secret)")
 		}
 		if r2.PublicBase == "" {
 			return fmt.Errorf("r2: missing R2_PUBLIC_BASE (needed for redirect)")
 		}
 	default:
-		return fmt.Errorf("invalid store driver: %q", cfg.Store.Driver)
+		return fmt.Errorf("invalid storage driver: %q", cfg.Storage.Driver)
 	}
 
 	switch cfg.DB.Driver {
 	case "memory":
 		return nil
-	case "mariadb":
-		return fmt.Errorf("db=mariadb not implemented yet")
+	case "mysql":
+		m := cfg.DB.MySQL
+		if m.Host == "" || m.User == "" || m.Database == "" {
+			return fmt.Errorf("mysql: missing required config (host/user/database)")
+		}
+		if m.Port == 0 {
+			return fmt.Errorf("mysql: missing port")
+		}
+		return nil
 	default:
 		return fmt.Errorf("invalid db driver: %q", cfg.DB.Driver)
 	}
-}
-
-func firstNonEmpty(vs ...string) string {
-	for _, v := range vs {
-		if strings.TrimSpace(v) != "" {
-			return v
-		}
-	}
-	return ""
 }

@@ -5,15 +5,15 @@ import (
 	"context"
 
 	"github.com/zetaoss/zavatar/internal/config"
-	"github.com/zetaoss/zavatar/internal/storage/object"
-	objectfs "github.com/zetaoss/zavatar/internal/storage/object/fs"
-	objectr2 "github.com/zetaoss/zavatar/internal/storage/object/r2"
+	storagestore "github.com/zetaoss/zavatar/internal/store/storage"
+	filesystemstorage "github.com/zetaoss/zavatar/internal/store/storage/filesystem"
+	r2storage "github.com/zetaoss/zavatar/internal/store/storage/r2"
 )
 
-func wireStore(ctx context.Context, sc config.StoreConfig) (object.Store, error) {
+func wireStorage(ctx context.Context, sc config.StorageConfig) (storagestore.Storage, error) {
 	switch sc.Driver {
 	case "r2":
-		return objectr2.New(ctx, objectr2.Config{
+		return r2storage.New(ctx, r2storage.Config{
 			AccountID:       sc.R2.AccountID,
 			Bucket:          sc.R2.Bucket,
 			AccessKeyID:     sc.R2.AccessKeyID,
@@ -23,6 +23,6 @@ func wireStore(ctx context.Context, sc config.StoreConfig) (object.Store, error)
 		})
 
 	default: // file
-		return objectfs.New(), nil
+		return filesystemstorage.New(), nil
 	}
 }
