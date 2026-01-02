@@ -25,8 +25,14 @@ go.work
 go.work.sum
 
 # env file
-.env
+#.env
+.env*
+!.env.example
 
 # Editor/IDE
-# .idea/
-# .vscode/
+.idea/
+.vscode/
+
+# zavatar
+bin/
+data/
