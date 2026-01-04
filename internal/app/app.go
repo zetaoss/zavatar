@@ -31,16 +31,16 @@ func Run(c Config) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	obj, err := wireStorage(ctx, cfg.Storage)
+	storage, err := wireStorage(ctx, cfg.Storage)
 	if err != nil {
 		return err
 	}
-	users, err := wireDB(cfg.DB)
+	db, err := wireDB(cfg.DB)
 	if err != nil {
 		return err
 	}
 
-	avatarSvc := service.NewAvatarService(obj, users, cfg.SiteSalt)
+	avatarSvc := service.NewAvatarService(storage, db, cfg.SiteSalt)
 	avatarH := handler.NewAvatarHandler(avatarSvc)
 	h := router(avatarH)
 

@@ -38,17 +38,47 @@ func New(cfg Config) (*DB, error) {
 
 	if err := db.Ping(); err != nil {
 		_ = db.Close()
-		return nil, err
+		return nil, fmt.Errorf("mysql: ping failed: %w", err)
 	}
 
-	return &DB{db: db}, nil
+	d := &DB{db: db}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	if err := d.validateSchema(ctx); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("mysql: schema validation failed: %w", err)
+	}
+
+	return d, nil
 }
+
+func (d *DB) validateSchema(ctx context.Context) error {
+	const q = `SELECT name, t, ghash FROM profiles LIMIT 0`
+
+	rows, err := d.db.QueryContext(ctx, q)
+	if err != nil {
+		return fmt.Errorf("mysql: invalid schema (profiles): %w", err)
+	}
+	defer func() {
+		_ = rows.Close()
+	}()
+
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("mysql: invalid schema (profiles): %w", err)
+	}
+
+	return nil
+}
+
 func (d *DB) Close() error {
 	return d.db.Close()
 }
 
 func (d *DB) Get(ctx context.Context, userID int64) (*domain.UserProfile, error) {
 	const q = `SELECT name, t, ghash FROM profiles WHERE user_id = ? LIMIT 1`
+
 	var (
 		name  string
 		t     int
@@ -58,7 +88,7 @@ func (d *DB) Get(ctx context.Context, userID int64) (*domain.UserProfile, error)
 	err := d.db.QueryRowContext(ctx, q, userID).Scan(&name, &t, &ghash)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, sql.ErrNoRows
+			return nil, nil
 		}
 		return nil, fmt.Errorf("mysql: get profile user_id=%d: %w", userID, err)
 	}
