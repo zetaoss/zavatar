@@ -8,14 +8,17 @@ import (
 	"image/color"
 	"image/draw"
 	"image/png"
+	"strconv"
 
 	"github.com/zetaoss/zavatar/internal/render/util"
 )
 
-func IdenticonPNG(userSalt string, size int) ([]byte, error) {
+func IdenticonPNG(siteSalt string, userID int64, size int) ([]byte, error) {
 	if size < 1 {
 		size = 1
 	}
+
+	userSalt := siteSalt + "|" + strconv.FormatInt(userID, 10)
 
 	bg := color.RGBA{R: 245, G: 245, B: 245, A: 255}
 	fg := pickColorRGBA(userSalt)

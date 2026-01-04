@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/url"
 	"strings"
 
@@ -46,7 +47,6 @@ func New(ctx context.Context, c Config) (*Storage, error) {
 	if c.SecretKey == "" {
 		return nil, fmt.Errorf("r2: missing secret key")
 	}
-	// c.Prefix can be empty
 	if c.PublicBase == "" {
 		return nil, fmt.Errorf("r2: missing public base")
 	}
@@ -84,23 +84,6 @@ func (s *Storage) key(k string) string {
 	return s.prefix + k
 }
 
-func (s *Storage) Exists(ctx context.Context, key string) (bool, error) {
-	_, err := s.s3.HeadObject(ctx, &s3.HeadObjectInput{
-		Bucket: aws.String(s.bucket),
-		Key:    aws.String(s.key(key)),
-	})
-	if err == nil {
-		return true, nil
-	}
-
-	var nf *s3types.NotFound
-	if errors.As(err, &nf) {
-		return false, nil
-	}
-
-	return false, err
-}
-
 func (s *Storage) Get(ctx context.Context, key string) (io.ReadCloser, string, error) {
 	out, err := s.s3.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(s.bucket),
@@ -129,4 +112,29 @@ func (s *Storage) PublicURL(key string) string {
 		return ""
 	}
 	return s.publicBase + "/" + s.key(key)
+}
+
+func (s *Storage) Ensure(ctx context.Context, key string, contentType string, gen func() ([]byte, error)) {
+	_, err := s.s3.HeadObject(ctx, &s3.HeadObjectInput{
+		Bucket: aws.String(s.bucket),
+		Key:    aws.String(s.key(key)),
+	})
+	if err == nil {
+		return
+	}
+
+	var nf *s3types.NotFound
+	if !errors.As(err, &nf) {
+		log.Printf("storage.ensure: head error: %v (key=%s)", err, key)
+	}
+
+	body, err := gen()
+	if err != nil {
+		log.Printf("storage.ensure: gen error: %v (key=%s)", err, key)
+		return
+	}
+
+	if err := s.Put(ctx, key, contentType, body); err != nil {
+		log.Printf("storage.ensure: put error: %v (key=%s)", err, key)
+	}
 }

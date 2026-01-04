@@ -57,5 +57,8 @@ func Run(c Config) error {
 	}()
 
 	log.Println("listening on", cfg.Addr)
-	return srv.ListenAndServe()
+	if err := srv.ListenAndServe(); err == http.ErrServerClosed {
+		return nil
+	}
+	return err
 }

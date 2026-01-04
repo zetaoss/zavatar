@@ -12,18 +12,17 @@ import (
 
 func LetterSVG(siteSalt, name string) []byte {
 	label := pickLetters(name)
+	if label == "" {
+		label = "?"
+	}
 	bg := pickColorHex(siteSalt + "|" + name)
 
-	n := len([]rune(label))
-	fontSize := 56
+	fontSize := 66
 	letterSpacing := "0"
-	y := 52
+	y := 53
 
-	if n <= 1 {
-		fontSize = 66
-		letterSpacing = "0"
-		y = 53
-	} else {
+	n := len([]rune(label))
+	if n > 1 {
 		fontSize = 54
 		letterSpacing = "-2"
 		y = 52

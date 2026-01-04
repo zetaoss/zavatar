@@ -1,4 +1,4 @@
-// internal/storage/storage.go
+// internal/store/storage/storage.go
 package storage
 
 import (
@@ -7,8 +7,8 @@ import (
 )
 
 type Storage interface {
-	Exists(ctx context.Context, key string) (bool, error)
 	Get(ctx context.Context, key string) (io.ReadCloser, string, error)
 	Put(ctx context.Context, key string, contentType string, body []byte) error
 	PublicURL(key string) string
+	Ensure(ctx context.Context, key string, contentType string, gen func() ([]byte, error))
 }
