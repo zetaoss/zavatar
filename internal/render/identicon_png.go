@@ -1,4 +1,5 @@
 // internal/render/identicon_png.go
+// internal/render/identicon_png.go
 package render
 
 import (
@@ -28,16 +29,16 @@ func IdenticonPNG(siteSalt string, userID int64, size int) ([]byte, error) {
 
 	sum := sha256.Sum256([]byte(userSalt))
 
-	targetPad := max(size/10, 1)
+	targetPad := util.Max(size/10, 1)
 	if size >= 20 && targetPad < 2 {
 		targetPad = 2
 	}
 
-	inner := max(size-2*targetPad, 5)
-	cell := max(inner/5, 1)
+	inner := util.Max(size-2*targetPad, 5)
+	cell := util.Max(inner/5, 1)
 
 	gridSize := 5 * cell
-	pad := max((size-gridSize)/2, 0)
+	pad := util.Max((size-gridSize)/2, 0)
 
 	const threshold = 85
 
@@ -93,9 +94,8 @@ func pickColorRGBA(userSalt string) color.RGBA {
 }
 
 type bitStream struct {
-	block  [32]byte
-	i      int
-	bitPos uint8
+	block [32]byte
+	i     int
 }
 
 func newBitStream(bytes []byte) *bitStream {
@@ -107,7 +107,6 @@ func newBitStream(bytes []byte) *bitStream {
 func (s *bitStream) refill() {
 	s.block = sha256.Sum256(s.block[:])
 	s.i = 0
-	s.bitPos = 0
 }
 
 func (s *bitStream) nextByte() byte {

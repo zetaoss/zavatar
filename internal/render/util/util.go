@@ -58,3 +58,10 @@ func abs(x float64) float64 {
 func mod(a, b float64) float64 {
 	return a - float64(int(a/b))*b
 }
+
+func Max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
