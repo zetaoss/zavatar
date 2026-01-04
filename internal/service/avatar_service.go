@@ -12,18 +12,16 @@ import (
 )
 
 type AvatarService struct {
-	storage      storagestore.Storage
-	db           dbstore.DB
-	siteSalt     string
-	siteSaltHash string
+	storage  storagestore.Storage
+	db       dbstore.DB
+	siteSalt string
 }
 
-func NewAvatarService(storage storagestore.Storage, db dbstore.DB, siteSalt, siteSaltHash string) *AvatarService {
+func NewAvatarService(storage storagestore.Storage, db dbstore.DB, siteSalt string) *AvatarService {
 	return &AvatarService{
-		storage:      storage,
-		db:           db,
-		siteSalt:     siteSalt,
-		siteSaltHash: siteSaltHash,
+		storage:  storage,
+		db:       db,
+		siteSalt: siteSalt,
 	}
 }
 
@@ -51,14 +49,14 @@ func (s *AvatarService) Resolve(ctx context.Context, in ResolveInput) (*ResolveO
 	}
 
 	if p.Type == "letter" {
-		key := domain.KeyLetterSVG(s.siteSaltHash, in.UserID)
+		key := domain.KeyLetterSVG(in.UserID)
 		s.storage.Ensure(ctx, key, "image/svg+xml; charset=utf-8", func() ([]byte, error) {
 			return render.LetterSVG(s.siteSalt, p.Name), nil
 		})
 		return &ResolveOutput{RedirectURL: s.storage.PublicURL(key)}, nil
 	}
 
-	key := domain.KeyIdenticonPNG(s.siteSaltHash, in.UserID, in.Size)
+	key := domain.KeyIdenticonPNG(in.UserID, in.Size)
 	s.storage.Ensure(ctx, key, "image/png", func() ([]byte, error) {
 		return render.IdenticonPNG(s.siteSalt, in.UserID, in.Size)
 	})

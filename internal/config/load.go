@@ -2,8 +2,6 @@
 package config
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"flag"
 	"fmt"
 	"strings"
@@ -80,8 +78,6 @@ func normalize(cfg *Config) {
 	if cfg.SiteSalt == "" {
 		cfg.SiteSalt = "example.com"
 	}
-	h := sha256.Sum256([]byte(cfg.SiteSalt))
-	cfg.SiteSaltHash = hex.EncodeToString(h[:])[:3]
 
 	// --- R2 ---
 	if p := strings.TrimSpace(cfg.Storage.R2.Prefix); p != "" && !strings.HasSuffix(p, "/") {

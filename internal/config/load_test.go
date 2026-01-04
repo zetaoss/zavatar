@@ -2,17 +2,10 @@
 package config
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
-
-func hashSalt(s string) string {
-	h := sha256.Sum256([]byte(s))
-	return hex.EncodeToString(h[:])[:3]
-}
 
 func TestLoad_Defaults(t *testing.T) {
 	cfg, err := Load(nil)
@@ -20,7 +13,6 @@ func TestLoad_Defaults(t *testing.T) {
 
 	require.Equal(t, ":8080", cfg.Addr)
 	require.Equal(t, "example.com", cfg.SiteSalt)
-	require.Equal(t, hashSalt("example.com"), cfg.SiteSaltHash)
 
 	require.Equal(t, "filesystem", cfg.Storage.Driver)
 	require.Equal(t, "memory", cfg.DB.Driver)
@@ -36,7 +28,6 @@ func TestLoad_TrimsAndNormalizes(t *testing.T) {
 
 	require.Equal(t, ":9999", cfg.Addr)
 	require.Equal(t, "hello", cfg.SiteSalt)
-	require.Equal(t, hashSalt("hello"), cfg.SiteSaltHash)
 }
 
 func TestLoad_R2_NormalizePrefixAndPublicBase(t *testing.T) {
@@ -182,5 +173,4 @@ func TestLoad_UsesEnvVars(t *testing.T) {
 
 	require.Equal(t, ":1234", cfg.Addr)
 	require.Equal(t, "envsalt", cfg.SiteSalt)
-	require.Equal(t, hashSalt("envsalt"), cfg.SiteSaltHash)
 }

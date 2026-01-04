@@ -1,5 +1,4 @@
 // internal/render/identicon_png.go
-// internal/render/identicon_png.go
 package render
 
 import (
@@ -9,6 +8,7 @@ import (
 	"image/color"
 	"image/draw"
 	"image/png"
+	"sort"
 	"strconv"
 
 	"github.com/zetaoss/zavatar/internal/render/util"
@@ -29,7 +29,7 @@ func IdenticonPNG(siteSalt string, userID int64, size int) ([]byte, error) {
 
 	sum := sha256.Sum256([]byte(userSalt))
 
-	targetPad := util.Max(size/10, 1)
+	targetPad := util.Max(size/16, 1)
 	if size >= 20 && targetPad < 2 {
 		targetPad = 2
 	}
@@ -40,23 +40,11 @@ func IdenticonPNG(siteSalt string, userID int64, size int) ([]byte, error) {
 	gridSize := 5 * cell
 	pad := util.Max((size-gridSize)/2, 0)
 
-	const threshold = 85
-
-	grid := [5][5]bool{}
-	stream := newBitStream(sum[:])
-
-	for y := range 5 {
-		for x := range 3 {
-			v := stream.nextByte()
-			on := v < threshold
-			grid[y][x] = on
-			grid[y][4-x] = on
-		}
-	}
+	grid := buildGrid(sum)
 
 	u := &image.Uniform{C: fg}
-	for y := range 5 {
-		for x := range 5 {
+	for y := 0; y < 5; y++ {
+		for x := 0; x < 5; x++ {
 			if !grid[y][x] {
 				continue
 			}
@@ -93,27 +81,85 @@ func pickColorRGBA(userSalt string) color.RGBA {
 	return color.RGBA{R: r, G: g, B: b, A: 255}
 }
 
-type bitStream struct {
-	block [32]byte
-	i     int
-}
+func buildGrid(seed [32]byte) [5][5]bool {
+	const (
+		minOn = 10
+		maxOn = 17
+	)
 
-func newBitStream(bytes []byte) *bitStream {
-	var bs bitStream
-	copy(bs.block[:], bytes)
-	return &bs
-}
+	desired := minOn + int(seed[0])%(maxOn-minOn+1)
 
-func (s *bitStream) refill() {
-	s.block = sha256.Sum256(s.block[:])
-	s.i = 0
-}
-
-func (s *bitStream) nextByte() byte {
-	if s.i >= len(s.block) {
-		s.refill()
+	type slot struct {
+		y, x   int
+		weight int
+		score  uint16
 	}
-	b := s.block[s.i]
-	s.i++
-	return b
+
+	slots := make([]slot, 0, 15)
+	idx := 1
+
+	for y := range 5 {
+		for x := range 3 {
+			w := 2
+			if x == 2 {
+				w = 1
+			}
+			score := uint16(seed[idx])<<8 | uint16(seed[idx+1])
+			idx += 2
+			slots = append(slots, slot{y: y, x: x, weight: w, score: score})
+		}
+	}
+
+	sort.Slice(slots, func(i, j int) bool {
+		return slots[i].score < slots[j].score
+	})
+
+	remTwos, remOnes := 10, 5
+	total := 0
+
+	var grid [5][5]bool
+
+	for _, s := range slots {
+		if s.weight == 2 {
+			remTwos--
+		} else {
+			remOnes--
+		}
+
+		if total+s.weight <= desired && canFill(desired-(total+s.weight), remTwos, remOnes) {
+			total += s.weight
+			grid[s.y][s.x] = true
+			grid[s.y][4-s.x] = true
+		}
+	}
+
+	return grid
+}
+
+func canFill(rem, twos, ones int) bool {
+	if rem < 0 {
+		return false
+	}
+	if rem == 0 {
+		return true
+	}
+
+	max := 2*twos + ones
+	if rem > max {
+		return false
+	}
+
+	lo := rem - 2*twos
+	if lo < 0 {
+		lo = 0
+	}
+	hi := rem
+	if hi > ones {
+		hi = ones
+	}
+	if lo > hi {
+		return false
+	}
+
+	return ((rem-lo)%2) == 0 || lo+1 <= hi
 }
