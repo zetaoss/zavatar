@@ -4,6 +4,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"log"
 
 	"github.com/zetaoss/zavatar/internal/domain"
 	"github.com/zetaoss/zavatar/internal/render"
@@ -40,7 +41,11 @@ func (s *AvatarService) Resolve(ctx context.Context, in ResolveInput) (*ResolveO
 	}
 
 	p, err := s.db.Get(ctx, in.UserID)
-	if err != nil || p == nil {
+	if err != nil {
+		log.Printf("avatar service: resolve: db.Get: %v", err)
+		return nil, fmt.Errorf("avatar service: resolve: db.Get: %w", err)
+	}
+	if p == nil {
 		p = &domain.UserProfile{Name: fmt.Sprintf("u%d", in.UserID), Type: "identicon"}
 	}
 
