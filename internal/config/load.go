@@ -2,6 +2,8 @@
 package config
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"strings"
@@ -14,18 +16,11 @@ func Load(args []string) (Config, error) {
 
 	// Server
 	addr := fs.String("addr", ":8080", "listen address, e.g. :8080 (env: ADDR)")
+	siteSalt := fs.String("site-salt", "example.com", "avatar site salt (env: SITE_SALT)")
 
 	// Drivers
-	storageDriver := fs.String(
-		"storage-driver",
-		"filesystem",
-		"storage driver: filesystem|r2 (env: STORAGE_DRIVER)",
-	)
-	dbDriver := fs.String(
-		"db-driver",
-		"memory",
-		"db driver: memory|mysql (env: DB_DRIVER)",
-	)
+	storageDriver := fs.String("storage-driver", "filesystem", "storage driver: filesystem|r2 (env: STORAGE_DRIVER)")
+	dbDriver := fs.String("db-driver", "memory", "db driver: memory|mysql (env: DB_DRIVER)")
 
 	// R2
 	r2AccountID := fs.String("r2-account-id", "", "env: R2_ACCOUNT_ID")
@@ -41,18 +36,14 @@ func Load(args []string) (Config, error) {
 	mysqlUsername := fs.String("mysql-username", "", "env: MYSQL_USERNAME")
 	mysqlPassword := fs.String("mysql-password", "", "env: MYSQL_PASSWORD")
 	mysqlDatabase := fs.String("mysql-database", "", "env: MYSQL_DATABASE")
-	if err := ff.Parse(
-		fs,
-		args,
-		ff.WithEnvVarNoPrefix(),
-		ff.WithEnvVarPrefix(""),
-	); err != nil {
+
+	if err := ff.Parse(fs, args, ff.WithEnvVars()); err != nil {
 		return Config{}, err
 	}
 
 	cfg := Config{
-		Addr: strings.TrimSpace(*addr),
-
+		Addr:     strings.TrimSpace(*addr),
+		SiteSalt: strings.TrimSpace(*siteSalt),
 		Storage: StorageConfig{
 			Driver: strings.TrimSpace(*storageDriver),
 			R2: R2Config{
@@ -64,7 +55,6 @@ func Load(args []string) (Config, error) {
 				PublicBase: strings.TrimSpace(*r2PublicBase),
 			},
 		},
-
 		DB: DBConfig{
 			Driver: strings.TrimSpace(*dbDriver),
 			MySQL: MySQLConfig{
@@ -85,6 +75,15 @@ func Load(args []string) (Config, error) {
 }
 
 func normalize(cfg *Config) {
+	// --- avatar site salt ---
+	cfg.SiteSalt = strings.TrimSpace(cfg.SiteSalt)
+	if cfg.SiteSalt == "" {
+		cfg.SiteSalt = "example.com"
+	}
+	h := sha256.Sum256([]byte(cfg.SiteSalt))
+	cfg.SiteSaltHash = hex.EncodeToString(h[:])[:3]
+
+	// --- R2 ---
 	if p := strings.TrimSpace(cfg.Storage.R2.Prefix); p != "" && !strings.HasSuffix(p, "/") {
 		cfg.Storage.R2.Prefix = p + "/"
 	}
@@ -110,7 +109,6 @@ func validate(cfg Config) error {
 		if r2.SecretKey == "" {
 			return fmt.Errorf("r2: missing R2_SECRET_KEY")
 		}
-		// r2.Prefix can be empty
 		if r2.PublicBase == "" {
 			return fmt.Errorf("r2: missing R2_PUBLIC_BASE")
 		}

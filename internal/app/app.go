@@ -40,7 +40,7 @@ func Run(c Config) error {
 		return err
 	}
 
-	avatarSvc := service.NewAvatarService(obj, users)
+	avatarSvc := service.NewAvatarService(obj, users, cfg.SiteSalt, cfg.SiteSaltHash)
 	avatarH := handler.NewAvatarHandler(avatarSvc)
 	h := router(avatarH)
 

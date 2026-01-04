@@ -4,6 +4,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"log"
 	"strconv"
 
 	"github.com/zetaoss/zavatar/internal/domain"
@@ -13,12 +14,19 @@ import (
 )
 
 type AvatarService struct {
-	storage storagestore.Storage
-	db      dbstore.DB
+	storage      storagestore.Storage
+	db           dbstore.DB
+	siteSalt     string
+	siteSaltHash string
 }
 
-func NewAvatarService(storage storagestore.Storage, db dbstore.DB) *AvatarService {
-	return &AvatarService{storage, db}
+func NewAvatarService(storage storagestore.Storage, db dbstore.DB, siteSalt, siteSaltHash string) *AvatarService {
+	return &AvatarService{
+		storage:      storage,
+		db:           db,
+		siteSalt:     siteSalt,
+		siteSaltHash: siteSaltHash,
+	}
 }
 
 type ResolveInput struct {
@@ -48,28 +56,41 @@ func (s *AvatarService) Resolve(ctx context.Context, in ResolveInput) (*ResolveO
 
 	// letter: SVG
 	if p.Type == "letter" {
-		key := domain.KeyLetterSVG(in.UserID)
-		exists, _ := s.storage.Exists(ctx, key)
+		key := domain.KeyLetterSVG(s.siteSaltHash, in.UserID)
+
+		exists, err := s.storage.Exists(ctx, key)
+		if err != nil {
+			log.Printf("avatar_service: storage.Exists error: %v", err)
+		}
 		if !exists {
-			body := render.LetterSVG(p.Name)
-			_ = s.storage.Put(ctx, key, "image/svg+xml; charset=utf-8", body)
+			body := render.LetterSVG(s.siteSalt, p.Name)
+			if err := s.storage.Put(ctx, key, "image/svg+xml; charset=utf-8", body); err != nil {
+				log.Printf("avatar_service: storage.Put error: %v", err)
+			}
 		}
 		return &ResolveOutput{RedirectURL: s.storage.PublicURL(key)}, nil
 	}
 
 	// identicon: PNG
-	key := domain.KeyPNG(in.UserID, in.Size)
-	exists, _ := s.storage.Exists(ctx, key)
+	key := domain.KeyIdenticonPNG(s.siteSaltHash, in.UserID, in.Size)
+
+	exists, err := s.storage.Exists(ctx, key)
+	if err != nil {
+		log.Printf("avatar_service: storage.Exists error: %v", err)
+	}
 	if exists {
 		return &ResolveOutput{RedirectURL: s.storage.PublicURL(key)}, nil
 	}
 
-	seed := "u:" + strconv.FormatInt(in.UserID, 10) + ":" + p.Name
-	pngBytes, err := render.IdenticonPNG(seed, in.Size)
+	userSalt := s.siteSalt + "|" + strconv.FormatInt(in.UserID, 10)
+
+	pngBytes, err := render.IdenticonPNG(userSalt, in.Size)
 	if err != nil {
 		return nil, err
 	}
-	_ = s.storage.Put(ctx, key, "image/png", pngBytes)
+	if err := s.storage.Put(ctx, key, "image/png", pngBytes); err != nil {
+		log.Printf("avatar_service: storage.Put error: %v", err)
+	}
 
 	return &ResolveOutput{RedirectURL: s.storage.PublicURL(key)}, nil
 }

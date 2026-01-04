@@ -5,72 +5,133 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"strings"
+	"unicode"
+
+	"github.com/zetaoss/zavatar/internal/render/util"
 )
 
-func LetterSVG(name string) []byte {
-	ch := pickLetter(name)
-	bg := pickColorHex(name)
+func LetterSVG(siteSalt, name string) []byte {
+	label := pickLetters(name)
+	bg := pickColorHex(siteSalt + "|" + name)
 
-	svg := fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="Avatar">
-  <rect width="100" height="100" fill="%s"/>
-  <text x="50" y="52"
-        text-anchor="middle" dominant-baseline="middle"
-        font-family="system-ui, -apple-system, Segoe UI, Roboto, Noto Sans KR, Apple SD Gothic Neo, sans-serif"
-        font-weight="700" font-size="56" fill="#fff">%s</text>
-</svg>`, bg, xmlEscape(string(ch)))
+	n := len([]rune(label))
+	fontSize := 56
+	letterSpacing := "0"
+	y := 52
+
+	if n <= 1 {
+		fontSize = 66
+		letterSpacing = "0"
+		y = 53
+	} else {
+		fontSize = 54
+		letterSpacing = "-2"
+		y = 52
+	}
+
+	svg := fmt.Sprintf(
+		`<?xml version="1.0" encoding="UTF-8"?><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="Avatar"><rect width="100" height="100" fill="%s"/><text x="50" y="%d" text-anchor="middle" dominant-baseline="middle" font-family="system-ui,-apple-system,Segoe UI,Roboto,Noto Sans KR,Apple SD Gothic Neo,sans-serif" font-weight="700" font-size="%d" letter-spacing="%s" fill="#fff">%s</text></svg>`,
+		bg,
+		y,
+		fontSize,
+		letterSpacing,
+		xmlEscape(label),
+	)
 
 	return []byte(svg)
 }
 
-func pickLetter(name string) rune {
+func pickLetters(name string) string {
 	name = strings.TrimSpace(name)
 	if name == "" {
-		return '?'
+		return "?"
 	}
-	for _, r := range name {
-		if r == ' ' || r == '\t' || r == '\n' {
-			continue
+
+	parts := strings.Fields(name)
+	out := make([]rune, 0, 2)
+
+	appendFirst := func(s string) {
+		for _, r := range s {
+			if !isGoodLabelRune(r) {
+				continue
+			}
+			out = append(out, unicode.ToUpper(r))
+			return
 		}
-		if r >= 0xAC00 && r <= 0xD7A3 {
-			return hangulChoseong(r)
-		}
-		if r >= 'a' && r <= 'z' {
-			return r - 32
-		}
-		if r >= 'A' && r <= 'Z' {
-			return r
-		}
-		if r >= '0' && r <= '9' {
-			return r
-		}
-		return r
 	}
-	return '?'
+
+	for _, p := range parts {
+		appendFirst(p)
+		if len(out) >= 2 {
+			break
+		}
+	}
+
+	if len(out) == 0 {
+		appendFirst(name)
+	}
+
+	if len(out) == 0 {
+		return "?"
+	}
+
+	if len(out) > 2 {
+		out = out[:2]
+	}
+	return string(out)
 }
 
-var choseong = []rune("ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ")
-
-func hangulChoseong(r rune) rune {
-	sIndex := int(r - 0xAC00)
-	ci := sIndex / (21 * 28)
-	if ci < 0 || ci >= len(choseong) {
-		return 'ㅇ'
+func isGoodLabelRune(r rune) bool {
+	if r <= 0x1F || (r >= 0x7F && r <= 0x9F) {
+		return false
 	}
-	return choseong[ci]
+	return unicode.IsLetter(r) || unicode.IsDigit(r)
 }
 
 func pickColorHex(seed string) string {
-	h := sha256.Sum256([]byte(seed))
-	r := 40 + (h[0] % 160)
-	g := 40 + (h[1] % 160)
-	b := 40 + (h[2] % 160)
+	sum := sha256.Sum256([]byte(seed))
+
+	h := float64(int(sum[0]) * 360 / 256)
+	s := 0.62 + (float64(sum[1])/255.0)*0.24
+	v := 0.40 + (float64(sum[2])/255.0)*0.25
+
+	r, g, b := util.HSVToRGB(h, s, v)
+
+	luma := 0.2126*float64(r) + 0.7152*float64(g) + 0.0722*float64(b)
+	if luma > 170 {
+		r = uint8(float64(r) * 0.78)
+		g = uint8(float64(g) * 0.78)
+		b = uint8(float64(b) * 0.78)
+	}
+
 	return fmt.Sprintf("#%02x%02x%02x", r, g, b)
 }
 
 func xmlEscape(s string) string {
-	s = strings.ReplaceAll(s, "&", "&amp;")
-	s = strings.ReplaceAll(s, "<", "&lt;")
-	s = strings.ReplaceAll(s, ">", "&gt;")
-	return s
+	var b strings.Builder
+	b.Grow(len(s) + 8)
+	for _, r := range s {
+		if r <= 0x1F || (r >= 0x7F && r <= 0x9F) {
+			continue
+		}
+		switch r {
+		case '&':
+			b.WriteString("&amp;")
+		case '<':
+			b.WriteString("&lt;")
+		case '>':
+			b.WriteString("&gt;")
+		case '"':
+			b.WriteString("&quot;")
+		case '\'':
+			b.WriteString("&apos;")
+		default:
+			b.WriteRune(r)
+		}
+	}
+	out := b.String()
+	if out == "" {
+		return "?"
+	}
+	return out
 }
