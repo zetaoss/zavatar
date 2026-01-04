@@ -2,7 +2,8 @@
 package config
 
 type Config struct {
-	Addr string
+	Addr     string
+	SiteSalt string // env: SITE_SALT (default: example.com)
 
 	Storage StorageConfig
 	DB      DBConfig

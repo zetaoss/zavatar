@@ -1,8 +1,9 @@
+// internal/domain/key.go
 package domain
 
 import "fmt"
 
-func KeyPNG(userID int64, size int) string {
+func KeyIdenticonPNG(userID int64, size int) string {
 	return fmt.Sprintf("%d-s%d.png", userID, size)
 }
 func KeyLetterSVG(userID int64) string {

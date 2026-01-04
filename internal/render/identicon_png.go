@@ -1,3 +1,4 @@
+// internal/render/identicon_png.go
 package render
 
 import (
@@ -7,38 +8,41 @@ import (
 	"image/color"
 	"image/draw"
 	"image/png"
+	"sort"
+	"strconv"
+
+	"github.com/zetaoss/zavatar/internal/render/util"
 )
 
-func IdenticonPNG(seed string, size int) ([]byte, error) {
+func IdenticonPNG(siteSalt string, userID int64, size int) ([]byte, error) {
+	if size < 1 {
+		size = 1
+	}
+
+	userSalt := siteSalt + "|" + strconv.FormatInt(userID, 10)
+
 	bg := color.RGBA{R: 245, G: 245, B: 245, A: 255}
-	fg := pickColorRGBA(seed)
+	fg := pickColorRGBA(userSalt)
 
 	img := image.NewRGBA(image.Rect(0, 0, size, size))
 	draw.Draw(img, img.Bounds(), &image.Uniform{C: bg}, image.Point{}, draw.Src)
 
-	h := sha256.Sum256([]byte(seed))
+	sum := sha256.Sum256([]byte(userSalt))
 
-	grid := [5][5]bool{}
-	bi := 0
-	for y := 0; y < 5; y++ {
-		for x := 0; x < 3; x++ {
-			b := h[bi%len(h)]
-			bi++
-			on := (b & 1) == 1
-			grid[y][x] = on
-			grid[y][4-x] = on
-		}
+	targetPad := util.Max(size/16, 1)
+	if size >= 20 && targetPad < 2 {
+		targetPad = 2
 	}
 
-	pad := size / 10
-	if pad < 2 {
-		pad = 2
-	}
-	cell := (size - 2*pad) / 5
-	if cell < 1 {
-		cell = 1
-	}
+	inner := util.Max(size-2*targetPad, 5)
+	cell := util.Max(inner/5, 1)
 
+	gridSize := 5 * cell
+	pad := util.Max((size-gridSize)/2, 0)
+
+	grid := buildGrid(sum)
+
+	u := &image.Uniform{C: fg}
 	for y := 0; y < 5; y++ {
 		for x := 0; x < 5; x++ {
 			if !grid[y][x] {
@@ -47,7 +51,7 @@ func IdenticonPNG(seed string, size int) ([]byte, error) {
 			x0 := pad + x*cell
 			y0 := pad + y*cell
 			r := image.Rect(x0, y0, x0+cell, y0+cell)
-			draw.Draw(img, r, &image.Uniform{C: fg}, image.Point{}, draw.Src)
+			draw.Draw(img, r, u, image.Point{}, draw.Src)
 		}
 	}
 
@@ -58,10 +62,104 @@ func IdenticonPNG(seed string, size int) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func pickColorRGBA(seed string) color.RGBA {
-	h := sha256.Sum256([]byte(seed))
-	r := 60 + (h[0] % 180)
-	g := 60 + (h[1] % 180)
-	b := 60 + (h[2] % 180)
+func pickColorRGBA(userSalt string) color.RGBA {
+	sum := sha256.Sum256([]byte(userSalt))
+
+	h := int(sum[0]) * 360 / 256
+	s := 0.62 + (float64(sum[1])/255.0)*0.24
+	v := 0.52 + (float64(sum[2])/255.0)*0.20
+
+	r, g, b := util.HSVToRGB(float64(h), s, v)
+
+	luma := 0.2126*float64(r) + 0.7152*float64(g) + 0.0722*float64(b)
+	if luma > 210 {
+		r = uint8(float64(r) * 0.85)
+		g = uint8(float64(g) * 0.85)
+		b = uint8(float64(b) * 0.85)
+	}
+
 	return color.RGBA{R: r, G: g, B: b, A: 255}
+}
+
+func buildGrid(seed [32]byte) [5][5]bool {
+	const (
+		minOn = 10
+		maxOn = 17
+	)
+
+	desired := minOn + int(seed[0])%(maxOn-minOn+1)
+
+	type slot struct {
+		y, x   int
+		weight int
+		score  uint16
+	}
+
+	slots := make([]slot, 0, 15)
+	idx := 1
+
+	for y := range 5 {
+		for x := range 3 {
+			w := 2
+			if x == 2 {
+				w = 1
+			}
+			score := uint16(seed[idx])<<8 | uint16(seed[idx+1])
+			idx += 2
+			slots = append(slots, slot{y: y, x: x, weight: w, score: score})
+		}
+	}
+
+	sort.Slice(slots, func(i, j int) bool {
+		return slots[i].score < slots[j].score
+	})
+
+	remTwos, remOnes := 10, 5
+	total := 0
+
+	var grid [5][5]bool
+
+	for _, s := range slots {
+		if s.weight == 2 {
+			remTwos--
+		} else {
+			remOnes--
+		}
+
+		if total+s.weight <= desired && canFill(desired-(total+s.weight), remTwos, remOnes) {
+			total += s.weight
+			grid[s.y][s.x] = true
+			grid[s.y][4-s.x] = true
+		}
+	}
+
+	return grid
+}
+
+func canFill(rem, twos, ones int) bool {
+	if rem < 0 {
+		return false
+	}
+	if rem == 0 {
+		return true
+	}
+
+	max := 2*twos + ones
+	if rem > max {
+		return false
+	}
+
+	lo := rem - 2*twos
+	if lo < 0 {
+		lo = 0
+	}
+	hi := rem
+	if hi > ones {
+		hi = ones
+	}
+	if lo > hi {
+		return false
+	}
+
+	return ((rem-lo)%2) == 0 || lo+1 <= hi
 }

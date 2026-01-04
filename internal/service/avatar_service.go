@@ -4,7 +4,6 @@ package service
 import (
 	"context"
 	"fmt"
-	"strconv"
 
 	"github.com/zetaoss/zavatar/internal/domain"
 	"github.com/zetaoss/zavatar/internal/render"
@@ -13,12 +12,17 @@ import (
 )
 
 type AvatarService struct {
-	storage storagestore.Storage
-	db      dbstore.DB
+	storage  storagestore.Storage
+	db       dbstore.DB
+	siteSalt string
 }
 
-func NewAvatarService(storage storagestore.Storage, db dbstore.DB) *AvatarService {
-	return &AvatarService{storage, db}
+func NewAvatarService(storage storagestore.Storage, db dbstore.DB, siteSalt string) *AvatarService {
+	return &AvatarService{
+		storage:  storage,
+		db:       db,
+		siteSalt: siteSalt,
+	}
 }
 
 type ResolveInput struct {
@@ -40,36 +44,22 @@ func (s *AvatarService) Resolve(ctx context.Context, in ResolveInput) (*ResolveO
 		p = &domain.UserProfile{Name: fmt.Sprintf("u%d", in.UserID), Type: "identicon"}
 	}
 
-	// gravatar: redirect
 	if p.Type == "gravatar" && p.GHash != "" {
-		u := render.GravatarURL(p.GHash, in.Size)
-		return &ResolveOutput{RedirectURL: u}, nil
+		return &ResolveOutput{RedirectURL: render.GravatarURL(p.GHash, in.Size)}, nil
 	}
 
-	// letter: SVG
 	if p.Type == "letter" {
 		key := domain.KeyLetterSVG(in.UserID)
-		exists, _ := s.storage.Exists(ctx, key)
-		if !exists {
-			body := render.LetterSVG(p.Name)
-			_ = s.storage.Put(ctx, key, "image/svg+xml; charset=utf-8", body)
-		}
+		s.storage.Ensure(ctx, key, "image/svg+xml; charset=utf-8", func() ([]byte, error) {
+			return render.LetterSVG(s.siteSalt, p.Name), nil
+		})
 		return &ResolveOutput{RedirectURL: s.storage.PublicURL(key)}, nil
 	}
 
-	// identicon: PNG
-	key := domain.KeyPNG(in.UserID, in.Size)
-	exists, _ := s.storage.Exists(ctx, key)
-	if exists {
-		return &ResolveOutput{RedirectURL: s.storage.PublicURL(key)}, nil
-	}
-
-	seed := "u:" + strconv.FormatInt(in.UserID, 10) + ":" + p.Name
-	pngBytes, err := render.IdenticonPNG(seed, in.Size)
-	if err != nil {
-		return nil, err
-	}
-	_ = s.storage.Put(ctx, key, "image/png", pngBytes)
+	key := domain.KeyIdenticonPNG(in.UserID, in.Size)
+	s.storage.Ensure(ctx, key, "image/png", func() ([]byte, error) {
+		return render.IdenticonPNG(s.siteSalt, in.UserID, in.Size)
+	})
 
 	return &ResolveOutput{RedirectURL: s.storage.PublicURL(key)}, nil
 }

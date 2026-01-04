@@ -40,7 +40,7 @@ func Run(c Config) error {
 		return err
 	}
 
-	avatarSvc := service.NewAvatarService(obj, users)
+	avatarSvc := service.NewAvatarService(obj, users, cfg.SiteSalt)
 	avatarH := handler.NewAvatarHandler(avatarSvc)
 	h := router(avatarH)
 
@@ -57,5 +57,8 @@ func Run(c Config) error {
 	}()
 
 	log.Println("listening on", cfg.Addr)
-	return srv.ListenAndServe()
+	if err := srv.ListenAndServe(); err == http.ErrServerClosed {
+		return nil
+	}
+	return err
 }
