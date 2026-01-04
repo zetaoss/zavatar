@@ -42,19 +42,33 @@ func New(cfg Config) (*DB, error) {
 	}
 
 	d := &DB{db: db}
-	if err := d.validateSchema(context.Background()); err != nil {
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	if err := d.validateSchema(ctx); err != nil {
 		_ = db.Close()
 		return nil, fmt.Errorf("mysql: schema validation failed: %w", err)
 	}
 
-	return &DB{db: db}, nil
+	return d, nil
 }
 
 func (d *DB) validateSchema(ctx context.Context) error {
 	const q = `SELECT name, t, ghash FROM profiles LIMIT 0`
-	if _, err := d.db.QueryContext(ctx, q); err != nil {
+
+	rows, err := d.db.QueryContext(ctx, q)
+	if err != nil {
 		return fmt.Errorf("mysql: invalid schema (profiles): %w", err)
 	}
+	defer func() {
+		_ = rows.Close()
+	}()
+
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("mysql: invalid schema (profiles): %w", err)
+	}
+
 	return nil
 }
 
@@ -64,6 +78,7 @@ func (d *DB) Close() error {
 
 func (d *DB) Get(ctx context.Context, userID int64) (*domain.UserProfile, error) {
 	const q = `SELECT name, t, ghash FROM profiles WHERE user_id = ? LIMIT 1`
+
 	var (
 		name  string
 		t     int
