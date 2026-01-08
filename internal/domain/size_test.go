@@ -50,9 +50,9 @@ func TestNormalizeSizeQuery(t *testing.T) {
 		expected int
 	}{
 		// invalid
-		{"Empty string", "", DefaultSize},
-		{"Invalid string (text)", "abc", DefaultSize},
-		{"Invalid string (mixed)", "12px", DefaultSize},
+		{"Empty string", "", maxSize()},
+		{"Invalid string (text)", "abc", maxSize()},
+		{"Invalid string (mixed)", "12px", maxSize()},
 
 		// valid
 		{"Valid string (bucket up)", "15", 16},

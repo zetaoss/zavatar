@@ -28,7 +28,7 @@ url:
 	@echo " (open in browser)"
 	@echo "=========================================="
 	@echo ""
-	@echo "letter (uid=1, s=40)              http://localhost:8080/u/1?s=40"
+	@echo "letter (uid=1, s=40)               http://localhost:8080/u/1?s=40"
 	@echo "identicon (uid=2, s=200->norm)     http://localhost:8080/u/2?s=200"
 	@echo "gravatar (uid=3, s=40)             http://localhost:8080/u/3?s=40"
 	@echo "letter large (uid=1, s=320)        http://localhost:8080/u/1?s=320"

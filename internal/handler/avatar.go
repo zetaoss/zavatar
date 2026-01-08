@@ -13,6 +13,7 @@ import (
 
 	"github.com/zetaoss/zavatar/internal/domain"
 	"github.com/zetaoss/zavatar/internal/service"
+	"github.com/zetaoss/zavatar/internal/store/storage"
 )
 
 type AvatarHandler struct {
@@ -50,6 +51,10 @@ func (h *AvatarHandler) GetAvatar(w http.ResponseWriter, r *http.Request) {
 		T:      t,
 	})
 	if err != nil {
+		if storage.IsNotFound(err) {
+			http.NotFound(w, r)
+			return
+		}
 		log.Printf("AvatarHandler.GetAvatar: resolve failed: %v", err)
 		http.Error(w, "resolve failed", http.StatusInternalServerError)
 		return

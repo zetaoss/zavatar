@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"strings"
 	"time"
@@ -15,6 +16,14 @@ import (
 	"github.com/zetaoss/zavatar/internal/render"
 	"github.com/zetaoss/zavatar/internal/store/db"
 	"github.com/zetaoss/zavatar/internal/store/storage"
+)
+
+const (
+	cachePreview  = "public, max-age=60"
+	cacheOfficial = "public, max-age=31536000, immutable"
+	cacheUnstable = "public, max-age=300"
+
+	maxRemoteBytes = 2 << 20
 )
 
 type AvatarService struct {
@@ -59,7 +68,10 @@ func (s *AvatarService) Resolve(ctx context.Context, in ResolveInput) (*ResolveO
 
 	prof, err := s.db.Get(ctx, in.UserID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("db.Get err: %w", err)
+	}
+	if prof == nil {
+		return nil, storage.ErrNotFound
 	}
 
 	typ := strings.TrimSpace(prof.Type)
@@ -71,57 +83,70 @@ func (s *AvatarService) Resolve(ctx context.Context, in ResolveInput) (*ResolveO
 	}
 
 	if isPreview {
-		sfKey := fmt.Sprintf("preview|t=%d|type=%s|uid=%d|s=%d", in.T, typ, in.UserID, sizeEff)
+		sfKey := fmt.Sprintf("official|uid=%d|s=%d", in.UserID, sizeEff)
 		b, err := s.sfBytes(sfKey, func() ([]byte, error) {
-			return s.renderAt(ctx, prof, typ, in.UserID, sizeEff)
+			png, _, e := s.renderAt(ctx, prof, typ, in.UserID, sizeEff)
+			return png, e
 		})
 		if err != nil {
 			return nil, err
 		}
 		return &ResolveOutput{
 			PNG:          b,
-			CacheControl: "public, max-age=60",
+			CacheControl: cachePreview,
 		}, nil
 	}
 
 	officialKey := domain.KeyAvatar(in.UserID, sizeEff)
+
 	if b, err := s.storage.Get(ctx, officialKey); err == nil {
 		return &ResolveOutput{
 			PNG:          b,
-			CacheControl: "public, max-age=31536000, immutable",
+			CacheControl: cacheOfficial,
 		}, nil
-	} else {
-		if !storage.IsNotFound(err) {
-			return nil, err
-		}
+	} else if !storage.IsNotFound(err) {
+		return nil, err
+	}
+
+	type genRes struct {
+		png    []byte
+		stable bool
 	}
 
 	sfKey := fmt.Sprintf("official|type=%s|uid=%d|s=%d", typ, in.UserID, sizeEff)
-	b, err := s.sfBytes(sfKey, func() ([]byte, error) {
+	v, err, _ := s.sf.Do(sfKey, func() (any, error) {
 		if bb, e := s.storage.Get(ctx, officialKey); e == nil {
-			return bb, nil
-		} else {
-			if !storage.IsNotFound(e) {
+			return genRes{png: bb, stable: true}, nil
+		} else if !storage.IsNotFound(e) {
+			return nil, e
+		}
+
+		gen, stable, e := s.renderAt(ctx, prof, typ, in.UserID, sizeEff)
+		if e != nil {
+			return nil, e
+		}
+
+		if stable {
+			if e := s.storage.Put(ctx, officialKey, "image/png", gen); e != nil {
 				return nil, e
 			}
 		}
 
-		gen, e := s.renderAt(ctx, prof, typ, in.UserID, sizeEff)
-		if e != nil {
-			return nil, e
-		}
-		if e := s.storage.Put(ctx, officialKey, "image/png", gen); e != nil {
-			return nil, e
-		}
-		return gen, nil
+		return genRes{png: gen, stable: stable}, nil
 	})
 	if err != nil {
 		return nil, err
 	}
 
+	r := v.(genRes)
+	cc := cacheOfficial
+	if !r.stable {
+		cc = cacheUnstable
+	}
+
 	return &ResolveOutput{
-		PNG:          b,
-		CacheControl: "public, max-age=31536000, immutable",
+		PNG:          r.png,
+		CacheControl: cc,
 	}, nil
 }
 
@@ -130,7 +155,11 @@ func (s *AvatarService) sfBytes(key string, fn func() ([]byte, error)) ([]byte, 
 	if err != nil {
 		return nil, err
 	}
-	return v.([]byte), nil
+	b, ok := v.([]byte)
+	if !ok {
+		return nil, fmt.Errorf("singleflight: unexpected type %T", v)
+	}
+	return b, nil
 }
 
 func mapProfileType(t int) string {
@@ -146,25 +175,40 @@ func mapProfileType(t int) string {
 	}
 }
 
-func (s *AvatarService) renderAt(ctx context.Context, prof *domain.UserProfile, typ string, userID int64, size int) ([]byte, error) {
+func (s *AvatarService) renderAt(ctx context.Context, prof *domain.UserProfile, typ string, userID int64, size int) ([]byte, bool, error) {
 	switch typ {
 	case "identicon":
-		return render.IdenticonPNG(s.siteSalt, userID, size)
+		b, e := render.IdenticonPNG(s.siteSalt, userID, size)
+		return b, true, e
 
 	case "gravatar":
 		gh := strings.TrimSpace(prof.GHash)
 		if gh == "" {
 			name := safeName(prof.Name, userID)
-			return render.LetterPNG(s.siteSalt, name, size)
+			b, e := render.LetterPNG(s.siteSalt, name, size)
+			return b, true, e
 		}
+
 		url := render.GravatarURL(gh, size)
-		return s.fetchPNG(ctx, url)
+		b, e := s.fetchPNG(ctx, url)
+		if e == nil {
+			return b, true, nil
+		}
+
+		if storage.IsNotFound(e) {
+			name := safeName(prof.Name, userID)
+			fb, fe := render.LetterPNG(s.siteSalt, name, size)
+			return fb, false, fe
+		}
+
+		return nil, false, e
 
 	case "letter":
 		fallthrough
 	default:
 		name := safeName(prof.Name, userID)
-		return render.LetterPNG(s.siteSalt, name, size)
+		b, e := render.LetterPNG(s.siteSalt, name, size)
+		return b, true, e
 	}
 }
 
@@ -181,6 +225,8 @@ func (s *AvatarService) fetchPNG(ctx context.Context, url string) ([]byte, error
 	if err != nil {
 		return nil, err
 	}
+	req.Header.Set("Accept", "image/png,image/*;q=0.9,*/*;q=0.1")
+	req.Header.Set("User-Agent", "zavatar/1.0")
 
 	resp, err := s.httpClient.Do(req)
 	if err != nil {
@@ -195,5 +241,21 @@ func (s *AvatarService) fetchPNG(ctx context.Context, url string) ([]byte, error
 		return nil, fmt.Errorf("fetch failed: status=%d", resp.StatusCode)
 	}
 
-	return io.ReadAll(resp.Body)
+	if ct := resp.Header.Get("Content-Type"); ct != "" {
+		mt, _, perr := mime.ParseMediaType(ct)
+		if perr == nil && !strings.HasPrefix(mt, "image/") {
+			return nil, fmt.Errorf("fetch failed: content-type=%q", mt)
+		}
+	}
+
+	lr := io.LimitReader(resp.Body, maxRemoteBytes+1)
+	b, err := io.ReadAll(lr)
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(b)) > maxRemoteBytes {
+		return nil, fmt.Errorf("fetch failed: body too large")
+	}
+
+	return b, nil
 }

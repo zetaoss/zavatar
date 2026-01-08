@@ -81,7 +81,7 @@ func drawCenteredLabel(dst *image.RGBA, face font.Face, fg color.Color, label st
 
 	track := 0
 	if n > 1 {
-		track = -max(dst.Bounds().Dx()/50, 1)
+		track = -util.Max(dst.Bounds().Dx()/50, 1)
 	}
 
 	m := face.Metrics()
@@ -129,13 +129,6 @@ func measureRune(face font.Face, r rune) int {
 }
 
 func runeCount(s string) int { return len([]rune(s)) }
-
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
 
 func pickLetters(name string) string {
 	name = strings.TrimSpace(name)

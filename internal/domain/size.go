@@ -7,6 +7,10 @@ const DefaultSize = 320
 
 var PersistentSizes = []int{16, 32, 64, 128, 320}
 
+func maxSize() int {
+	return PersistentSizes[len(PersistentSizes)-1]
+}
+
 func NormalizeSizeInt(req int) int {
 	if req <= 0 {
 		return DefaultSize
