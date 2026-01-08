@@ -22,7 +22,7 @@ func IdenticonPNG(siteSalt string, userID int64, size int) ([]byte, error) {
 	userSalt := siteSalt + "|" + strconv.FormatInt(userID, 10)
 
 	bg := color.RGBA{R: 245, G: 245, B: 245, A: 255}
-	fg := pickColorRGBA(userSalt)
+	fg := util.PickColorRGBA(userSalt)
 
 	img := image.NewRGBA(image.Rect(0, 0, size, size))
 	draw.Draw(img, img.Bounds(), &image.Uniform{C: bg}, image.Point{}, draw.Src)
@@ -60,25 +60,6 @@ func IdenticonPNG(siteSalt string, userID int64, size int) ([]byte, error) {
 		return nil, err
 	}
 	return buf.Bytes(), nil
-}
-
-func pickColorRGBA(userSalt string) color.RGBA {
-	sum := sha256.Sum256([]byte(userSalt))
-
-	h := int(sum[0]) * 360 / 256
-	s := 0.62 + (float64(sum[1])/255.0)*0.24
-	v := 0.52 + (float64(sum[2])/255.0)*0.20
-
-	r, g, b := util.HSVToRGB(float64(h), s, v)
-
-	luma := 0.2126*float64(r) + 0.7152*float64(g) + 0.0722*float64(b)
-	if luma > 210 {
-		r = uint8(float64(r) * 0.85)
-		g = uint8(float64(g) * 0.85)
-		b = uint8(float64(b) * 0.85)
-	}
-
-	return color.RGBA{R: r, G: g, B: b, A: 255}
 }
 
 func buildGrid(seed [32]byte) [5][5]bool {

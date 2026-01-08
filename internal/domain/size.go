@@ -3,28 +3,30 @@ package domain
 
 import "strconv"
 
-const (
-	Size16  = 16
-	Size64  = 64
-	Size256 = 256
+const DefaultSize = 320
 
-	DefaultSize = Size64
-)
+var PersistentSizes = []int{16, 32, 64, 128, 320}
 
-var SupportedSizes = []int{Size16, Size64, Size256}
-
-func NormalizeSize(q string) int {
-	if q == "" {
+func NormalizeSizeInt(req int) int {
+	if req <= 0 {
 		return DefaultSize
 	}
-	n, err := strconv.Atoi(q)
-	if err != nil || n <= 0 {
-		return DefaultSize
-	}
-	for _, v := range SupportedSizes {
-		if n <= v {
-			return v
+
+	for _, s := range PersistentSizes {
+		if req <= s {
+			return s
 		}
 	}
-	return Size256
+	return DefaultSize
+}
+
+func NormalizeSizeQuery(v string) int {
+	if v == "" {
+		return DefaultSize
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil {
+		return DefaultSize
+	}
+	return NormalizeSizeInt(n)
 }
