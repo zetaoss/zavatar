@@ -3,12 +3,16 @@ package storage
 
 import (
 	"context"
-	"io"
+	"errors"
 )
 
+var ErrNotFound = errors.New("storage: not found")
+
+func IsNotFound(err error) bool {
+	return errors.Is(err, ErrNotFound)
+}
+
 type Storage interface {
-	Get(ctx context.Context, key string) (io.ReadCloser, string, error)
+	Get(ctx context.Context, key string) ([]byte, error)
 	Put(ctx context.Context, key string, contentType string, body []byte) error
-	PublicURL(key string) string
-	Ensure(ctx context.Context, key string, contentType string, gen func() ([]byte, error))
 }

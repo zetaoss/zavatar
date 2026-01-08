@@ -55,37 +55,38 @@ func New(cfg Config) (*DB, error) {
 }
 
 func (d *DB) validateSchema(ctx context.Context) error {
-	const q = `SELECT name, t, ghash FROM profiles LIMIT 0`
-
+	const q = `
+SELECT u.user_name, p.t, p.ghash FROM user u
+LEFT JOIN profiles p ON p.user_id = u.user_id LIMIT 0
+`
 	rows, err := d.db.QueryContext(ctx, q)
 	if err != nil {
-		return fmt.Errorf("mysql: invalid schema (profiles): %w", err)
+		return fmt.Errorf("mysql: invalid schema (user/profiles): %w", err)
 	}
-	defer func() {
-		_ = rows.Close()
-	}()
+	defer func() { _ = rows.Close() }()
 
 	if err := rows.Err(); err != nil {
-		return fmt.Errorf("mysql: invalid schema (profiles): %w", err)
+		return fmt.Errorf("mysql: invalid schema (user/profiles): %w", err)
 	}
-
 	return nil
 }
 
-func (d *DB) Close() error {
-	return d.db.Close()
-}
+func (d *DB) Close() error { return d.db.Close() }
 
 func (d *DB) Get(ctx context.Context, userID int64) (*domain.UserProfile, error) {
-	const q = `SELECT name, t, ghash FROM profiles WHERE user_id = ? LIMIT 1`
+	const q = `
+SELECT u.user_name, p.t, p.ghash FROM user u
+LEFT JOIN profiles p ON p.user_id = u.user_id
+WHERE u.user_id = ? LIMIT 1
+`
 
 	var (
-		name  string
-		t     int
-		ghash sql.NullString
+		userName []byte
+		t        sql.NullInt64
+		ghash    sql.NullString
 	)
 
-	err := d.db.QueryRowContext(ctx, q, userID).Scan(&name, &t, &ghash)
+	err := d.db.QueryRowContext(ctx, q, userID).Scan(&userName, &t, &ghash)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
@@ -93,9 +94,14 @@ func (d *DB) Get(ctx context.Context, userID int64) (*domain.UserProfile, error)
 		return nil, fmt.Errorf("mysql: get profile user_id=%d: %w", userID, err)
 	}
 
+	tt := int64(1)
+	if t.Valid {
+		tt = t.Int64
+	}
+
 	p := &domain.UserProfile{
-		Name: name,
-		Type: mapProfileType(t),
+		Name: string(userName),
+		Type: mapProfileType(tt),
 	}
 
 	if ghash.Valid {
@@ -105,7 +111,7 @@ func (d *DB) Get(ctx context.Context, userID int64) (*domain.UserProfile, error)
 	return p, nil
 }
 
-func mapProfileType(t int) string {
+func mapProfileType(t int64) string {
 	switch t {
 	case 1:
 		return "letter"

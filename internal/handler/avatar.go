@@ -2,13 +2,18 @@
 package handler
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"log"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 
 	"github.com/zetaoss/zavatar/internal/domain"
 	"github.com/zetaoss/zavatar/internal/service"
+	"github.com/zetaoss/zavatar/internal/store/storage"
 )
 
 type AvatarHandler struct {
@@ -27,16 +32,73 @@ func (h *AvatarHandler) GetAvatar(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	size := domain.NormalizeSize(r.URL.Query().Get("s"))
+	q := r.URL.Query()
+	sizeEff := domain.NormalizeSizeQuery(q.Get("s"))
+
+	t := 0
+	if ts := q.Get("t"); ts != "" {
+		tv, e := strconv.Atoi(ts)
+		if e != nil {
+			http.Error(w, "bad t", http.StatusBadRequest)
+			return
+		}
+		t = tv
+	}
 
 	out, err := h.svc.Resolve(r.Context(), service.ResolveInput{
 		UserID: uid,
-		Size:   size,
+		Size:   sizeEff,
+		T:      t,
 	})
 	if err != nil {
+		if storage.IsNotFound(err) {
+			http.NotFound(w, r)
+			return
+		}
+		log.Printf("AvatarHandler.GetAvatar: resolve failed: %v", err)
 		http.Error(w, "resolve failed", http.StatusInternalServerError)
 		return
 	}
 
-	http.Redirect(w, r, out.RedirectURL, http.StatusFound)
+	sum := sha256.Sum256(out.PNG)
+	etag := `"` + hex.EncodeToString(sum[:]) + `"`
+
+	w.Header().Set("Content-Type", "image/png")
+	if out.CacheControl != "" {
+		w.Header().Set("Cache-Control", out.CacheControl)
+	}
+	w.Header().Set("ETag", etag)
+
+	if matchIfNoneMatch(r.Header.Get("If-None-Match"), etag) {
+		w.WriteHeader(http.StatusNotModified)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(out.PNG)
+}
+
+func matchIfNoneMatch(ifNoneMatch string, etag string) bool {
+	ifNoneMatch = strings.TrimSpace(ifNoneMatch)
+	if ifNoneMatch == "" {
+		return false
+	}
+	if ifNoneMatch == "*" {
+		return true
+	}
+
+	parts := strings.Split(ifNoneMatch, ",")
+	for _, p := range parts {
+		tok := strings.TrimSpace(p)
+		if tok == "" {
+			continue
+		}
+		if tok == etag {
+			return true
+		}
+		if strings.HasPrefix(tok, "W/") && strings.TrimSpace(tok[2:]) == etag {
+			return true
+		}
+	}
+	return false
 }

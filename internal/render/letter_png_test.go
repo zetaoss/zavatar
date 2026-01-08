@@ -1,4 +1,4 @@
-// internal/render/letter_svg_test.go
+// internal/render/letter_png_test.go
 package render
 
 import (
@@ -74,4 +74,15 @@ func Test_pickLetters(t *testing.T) {
 			require.Equal(t, tc.want, pickLetters(tc.input))
 		})
 	}
+}
+
+func Test_LetterPNG_Basic(t *testing.T) {
+	t.Parallel()
+
+	b, err := LetterPNG("site", "alice bob", 64)
+	require.NoError(t, err)
+	require.Greater(t, len(b), 16)
+
+	// PNG signature: 89 50 4E 47 0D 0A 1A 0A
+	require.Equal(t, []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A}, b[:8])
 }

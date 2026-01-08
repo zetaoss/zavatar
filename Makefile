@@ -4,6 +4,7 @@ SHELL := /bin/bash
 
 .PHONY: run-dev
 run-dev:
+	@rm -rf ./data
 	@echo "▶ running"
 	go run ./cmd/zavatar
 
@@ -19,21 +20,22 @@ run-dev-mysql:
 	@set -a; . ./.env.mysql; set +a; \
 	go run ./cmd/zavatar
 
-.PHONY: curl
-curl:
-	@rm -rf ./data
-
+.PHONY: url
+url:
 	@echo ""
-	@echo "▶ letter avatar (uid=1)"
-	@curl -s -D- "http://localhost:8080/u/1?s=40&v=4" -o /dev/null
-
+	@echo "=========================================="
+	@echo " zavatar local test URLs"
+	@echo " (open in browser)"
+	@echo "=========================================="
 	@echo ""
-	@echo "▶ identicon avatar (uid=2)"
-	@curl -s -D- "http://localhost:8080/u/2?s=200&v=4" -o /dev/null
-
+	@echo "letter (uid=1, s=40)               http://localhost:8080/u/1?s=40"
+	@echo "identicon (uid=2, s=200->norm)     http://localhost:8080/u/2?s=200"
+	@echo "gravatar (uid=3, s=40)             http://localhost:8080/u/3?s=40"
+	@echo "letter large (uid=1, s=320)        http://localhost:8080/u/1?s=320"
 	@echo ""
-	@echo "▶ gravatar redirect (uid=3)"
-	@curl -s -D- "http://localhost:8080/u/3?s=40&v=4" -o /dev/null
+	@echo "preview identicon (uid=1, t=2)     http://localhost:8080/u/1?s=40&t=2"
+	@echo "preview gravatar (uid=3, t=3)      http://localhost:8080/u/3?s=80&t=3"
+	@echo "preview gravatar->letter fallback  http://localhost:8080/u/1?s=80&t=3"
 
 .PHONY: lint
 lint: lint-install

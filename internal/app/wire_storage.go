@@ -1,4 +1,4 @@
-// internal/app/wire_store.go
+// internal/app/wire_storage.go
 package app
 
 import (
@@ -22,7 +22,7 @@ func wireStorage(ctx context.Context, sc config.StorageConfig) (storagestore.Sto
 			PublicBase: sc.R2.PublicBase,
 		})
 
-	default: // file
+	default: // filesystem
 		return filesystemstorage.New(), nil
 	}
 }

@@ -73,13 +73,11 @@ func Load(args []string) (Config, error) {
 }
 
 func normalize(cfg *Config) {
-	// --- avatar site salt ---
 	cfg.SiteSalt = strings.TrimSpace(cfg.SiteSalt)
 	if cfg.SiteSalt == "" {
 		cfg.SiteSalt = "example.com"
 	}
 
-	// --- R2 ---
 	if p := strings.TrimSpace(cfg.Storage.R2.Prefix); p != "" && !strings.HasSuffix(p, "/") {
 		cfg.Storage.R2.Prefix = p + "/"
 	}
