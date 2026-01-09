@@ -15,12 +15,11 @@ type StorageConfig struct {
 }
 
 type R2Config struct {
-	AccountID  string
-	Bucket     string
-	AccessKey  string
-	SecretKey  string
-	Prefix     string
-	PublicBase string
+	AccountID string
+	Bucket    string
+	AccessKey string
+	SecretKey string
+	Prefix    string
 }
 
 type DBConfig struct {
