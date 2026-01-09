@@ -26,7 +26,6 @@ func Load(args []string) (Config, error) {
 	r2AccessKey := fs.String("r2-access-key", "", "env: R2_ACCESS_KEY")
 	r2SecretKey := fs.String("r2-secret-key", "", "env: R2_SECRET_KEY")
 	r2Prefix := fs.String("r2-prefix", "", "env: R2_PREFIX")
-	r2PublicBase := fs.String("r2-public-base", "", "env: R2_PUBLIC_BASE")
 
 	// MySQL
 	mysqlHost := fs.String("mysql-host", "", "env: MYSQL_HOST")
@@ -45,12 +44,11 @@ func Load(args []string) (Config, error) {
 		Storage: StorageConfig{
 			Driver: strings.TrimSpace(*storageDriver),
 			R2: R2Config{
-				AccountID:  strings.TrimSpace(*r2AccountID),
-				Bucket:     strings.TrimSpace(*r2Bucket),
-				AccessKey:  strings.TrimSpace(*r2AccessKey),
-				SecretKey:  strings.TrimSpace(*r2SecretKey),
-				Prefix:     strings.TrimSpace(*r2Prefix),
-				PublicBase: strings.TrimSpace(*r2PublicBase),
+				AccountID: strings.TrimSpace(*r2AccountID),
+				Bucket:    strings.TrimSpace(*r2Bucket),
+				AccessKey: strings.TrimSpace(*r2AccessKey),
+				SecretKey: strings.TrimSpace(*r2SecretKey),
+				Prefix:    strings.TrimSpace(*r2Prefix),
 			},
 		},
 		DB: DBConfig{
@@ -81,8 +79,6 @@ func normalize(cfg *Config) {
 	if p := strings.TrimSpace(cfg.Storage.R2.Prefix); p != "" && !strings.HasSuffix(p, "/") {
 		cfg.Storage.R2.Prefix = p + "/"
 	}
-	cfg.Storage.R2.PublicBase =
-		strings.TrimRight(strings.TrimSpace(cfg.Storage.R2.PublicBase), "/")
 }
 
 func validate(cfg Config) error {
@@ -102,9 +98,6 @@ func validate(cfg Config) error {
 		}
 		if r2.SecretKey == "" {
 			return fmt.Errorf("r2: missing R2_SECRET_KEY")
-		}
-		if r2.PublicBase == "" {
-			return fmt.Errorf("r2: missing R2_PUBLIC_BASE")
 		}
 	default:
 		return fmt.Errorf("invalid storage driver: %q", cfg.Storage.Driver)

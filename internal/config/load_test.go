@@ -30,7 +30,7 @@ func TestLoad_TrimsAndNormalizes(t *testing.T) {
 	require.Equal(t, "hello", cfg.SiteSalt)
 }
 
-func TestLoad_R2_NormalizePrefixAndPublicBase(t *testing.T) {
+func TestLoad_R2_NormalizePrefix(t *testing.T) {
 	cfg, err := Load([]string{
 		"-storage-driver", "r2",
 		"-r2-account-id", "acc",
@@ -38,13 +38,11 @@ func TestLoad_R2_NormalizePrefixAndPublicBase(t *testing.T) {
 		"-r2-access-key", "ak",
 		"-r2-secret-key", "sk",
 		"-r2-prefix", "dev",
-		"-r2-public-base", "https://example.com/base///",
 	})
 	require.NoError(t, err)
 
 	require.Equal(t, "r2", cfg.Storage.Driver)
 	require.Equal(t, "dev/", cfg.Storage.R2.Prefix)
-	require.Equal(t, "https://example.com/base", cfg.Storage.R2.PublicBase)
 }
 
 func TestLoad_R2_PrefixEmptyStaysEmpty(t *testing.T) {
@@ -55,7 +53,6 @@ func TestLoad_R2_PrefixEmptyStaysEmpty(t *testing.T) {
 		"-r2-access-key", "ak",
 		"-r2-secret-key", "sk",
 		"-r2-prefix", "   ",
-		"-r2-public-base", "https://example.com",
 	})
 	require.NoError(t, err)
 
@@ -69,7 +66,6 @@ func TestLoad_R2_ValidateMissingFields(t *testing.T) {
 			"-r2-bucket", "bucket",
 			"-r2-access-key", "ak",
 			"-r2-secret-key", "sk",
-			"-r2-public-base", "https://example.com",
 		})
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "r2: missing R2_ACCOUNT_ID")
@@ -81,7 +77,6 @@ func TestLoad_R2_ValidateMissingFields(t *testing.T) {
 			"-r2-account-id", "acc",
 			"-r2-access-key", "ak",
 			"-r2-secret-key", "sk",
-			"-r2-public-base", "https://example.com",
 		})
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "r2: missing R2_BUCKET")
@@ -93,7 +88,6 @@ func TestLoad_R2_ValidateMissingFields(t *testing.T) {
 			"-r2-account-id", "acc",
 			"-r2-bucket", "bucket",
 			"-r2-secret-key", "sk",
-			"-r2-public-base", "https://example.com",
 		})
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "r2: missing R2_ACCESS_KEY")
@@ -105,22 +99,9 @@ func TestLoad_R2_ValidateMissingFields(t *testing.T) {
 			"-r2-account-id", "acc",
 			"-r2-bucket", "bucket",
 			"-r2-access-key", "ak",
-			"-r2-public-base", "https://example.com",
 		})
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "r2: missing R2_SECRET_KEY")
-	})
-
-	t.Run("missing public base", func(t *testing.T) {
-		_, err := Load([]string{
-			"-storage-driver", "r2",
-			"-r2-account-id", "acc",
-			"-r2-bucket", "bucket",
-			"-r2-access-key", "ak",
-			"-r2-secret-key", "sk",
-		})
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "r2: missing R2_PUBLIC_BASE")
 	})
 }
 
