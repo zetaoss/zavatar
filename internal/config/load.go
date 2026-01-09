@@ -15,6 +15,10 @@ func Load(args []string) (Config, error) {
 	// Server
 	addr := fs.String("addr", ":8080", "listen address, e.g. :8080 (env: ADDR)")
 	siteSalt := fs.String("site-salt", "example.com", "avatar site salt (env: SITE_SALT)")
+	purgeKey := fs.String("purge-key", "", "purge key (env: PURGE_KEY)")
+	baseURL := fs.String("base-url", "", "public base url, e.g. https://avatars.example.com (env: BASE_URL)")
+	cfZoneID := fs.String("cf-zone-id", "", "cloudflare zone id (env: CF_ZONE_ID)")
+	cfAPIToken := fs.String("cf-api-token", "", "cloudflare api token (env: CF_API_TOKEN)")
 
 	// Drivers
 	storageDriver := fs.String("storage-driver", "filesystem", "storage driver: filesystem|r2 (env: STORAGE_DRIVER)")
@@ -42,6 +46,12 @@ func Load(args []string) (Config, error) {
 	cfg := Config{
 		Addr:     strings.TrimSpace(*addr),
 		SiteSalt: strings.TrimSpace(*siteSalt),
+		PurgeKey: strings.TrimSpace(*purgeKey),
+		BaseURL:  strings.TrimSpace(*baseURL),
+		Cloudflare: CloudflareConfig{
+			ZoneID:   strings.TrimSpace(*cfZoneID),
+			APIToken: strings.TrimSpace(*cfAPIToken),
+		},
 		Storage: StorageConfig{
 			Driver: strings.TrimSpace(*storageDriver),
 			R2: R2Config{
