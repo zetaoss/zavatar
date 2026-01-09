@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/zetaoss/zavatar/internal/domain"
@@ -13,15 +14,24 @@ import (
 
 type DB struct {
 	db *sql.DB
+
+	// raw
+	database     string
+	userDatabase string
+
+	// quoted & validated (computed once in New)
+	quotedDatabase     string
+	quotedUserDatabase string
 }
 
 type Config struct {
-	Host     string
-	Port     int
-	Username string
-	Password string
-	Database string
-	Params   string
+	Host         string
+	Port         int
+	Username     string
+	Password     string
+	Database     string
+	UserDatabase string
+	Params       string
 }
 
 func New(cfg Config) (*DB, error) {
@@ -41,7 +51,24 @@ func New(cfg Config) (*DB, error) {
 		return nil, fmt.Errorf("mysql: ping failed: %w", err)
 	}
 
-	d := &DB{db: db}
+	qdb, err := quoteIdent(cfg.Database)
+	if err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("mysql: invalid Database: %w", err)
+	}
+	qudb, err := quoteIdent(cfg.UserDatabase)
+	if err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("mysql: invalid UserDatabase: %w", err)
+	}
+
+	d := &DB{
+		db:                 db,
+		database:           cfg.Database,
+		userDatabase:       cfg.UserDatabase,
+		quotedDatabase:     qdb,
+		quotedUserDatabase: qudb,
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
@@ -55,10 +82,11 @@ func New(cfg Config) (*DB, error) {
 }
 
 func (d *DB) validateSchema(ctx context.Context) error {
-	const q = `
-SELECT u.user_name, p.t, p.ghash FROM user u
-LEFT JOIN profiles p ON p.user_id = u.user_id LIMIT 0
-`
+	q := fmt.Sprintf(`
+SELECT u.user_name, p.t, p.ghash FROM %s.user u
+LEFT JOIN %s.profiles p ON p.user_id = u.user_id LIMIT 0
+`, d.quotedUserDatabase, d.quotedDatabase)
+
 	rows, err := d.db.QueryContext(ctx, q)
 	if err != nil {
 		return fmt.Errorf("mysql: invalid schema (user/profiles): %w", err)
@@ -74,11 +102,11 @@ LEFT JOIN profiles p ON p.user_id = u.user_id LIMIT 0
 func (d *DB) Close() error { return d.db.Close() }
 
 func (d *DB) Get(ctx context.Context, userID int64) (*domain.UserProfile, error) {
-	const q = `
-SELECT u.user_name, p.t, p.ghash FROM user u
-LEFT JOIN profiles p ON p.user_id = u.user_id
+	q := fmt.Sprintf(`
+SELECT u.user_name, p.t, p.ghash FROM %s.user u
+LEFT JOIN %s.profiles p ON p.user_id = u.user_id
 WHERE u.user_id = ? LIMIT 1
-`
+`, d.quotedUserDatabase, d.quotedDatabase)
 
 	var (
 		userName []byte
@@ -103,12 +131,26 @@ WHERE u.user_id = ? LIMIT 1
 		Name: string(userName),
 		Type: mapProfileType(tt),
 	}
-
 	if ghash.Valid {
 		p.GHash = ghash.String
 	}
-
 	return p, nil
+}
+
+func quoteIdent(s string) (string, error) {
+	if s == "" {
+		return "", fmt.Errorf("empty identifier")
+	}
+	for _, r := range s {
+		if r == 0 {
+			return "", fmt.Errorf("identifier contains NUL")
+		}
+		if r < 0x20 || r == 0x7f {
+			return "", fmt.Errorf("identifier contains control char: %q", r)
+		}
+	}
+	escaped := strings.ReplaceAll(s, "`", "``")
+	return "`" + escaped + "`", nil
 }
 
 func mapProfileType(t int64) string {

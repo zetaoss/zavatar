@@ -33,6 +33,7 @@ func Load(args []string) (Config, error) {
 	mysqlUsername := fs.String("mysql-username", "", "env: MYSQL_USERNAME")
 	mysqlPassword := fs.String("mysql-password", "", "env: MYSQL_PASSWORD")
 	mysqlDatabase := fs.String("mysql-database", "", "env: MYSQL_DATABASE")
+	mysqlUserDatabase := fs.String("mysql-user-database", "", "env: MYSQL_USER_DATABASE")
 
 	if err := ff.Parse(fs, args, ff.WithEnvVars()); err != nil {
 		return Config{}, err
@@ -54,11 +55,12 @@ func Load(args []string) (Config, error) {
 		DB: DBConfig{
 			Driver: strings.TrimSpace(*dbDriver),
 			MySQL: MySQLConfig{
-				Host:     strings.TrimSpace(*mysqlHost),
-				Port:     *mysqlPort,
-				Username: strings.TrimSpace(*mysqlUsername),
-				Password: strings.TrimSpace(*mysqlPassword),
-				Database: strings.TrimSpace(*mysqlDatabase),
+				Host:         strings.TrimSpace(*mysqlHost),
+				Port:         *mysqlPort,
+				Username:     strings.TrimSpace(*mysqlUsername),
+				Password:     strings.TrimSpace(*mysqlPassword),
+				Database:     strings.TrimSpace(*mysqlDatabase),
+				UserDatabase: strings.TrimSpace(*mysqlUserDatabase),
 			},
 		},
 	}
@@ -122,6 +124,9 @@ func validate(cfg Config) error {
 		}
 		if m.Database == "" {
 			return fmt.Errorf("mysql: missing required config database")
+		}
+		if m.UserDatabase == "" {
+			return fmt.Errorf("mysql: missing required config user database")
 		}
 		return nil
 	default:

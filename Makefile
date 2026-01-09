@@ -59,6 +59,11 @@ test:
 	@echo "▶ go test"
 	@go test -v ./...
 
+.PHONY: test-integration
+test-integration:
+	@echo "▶ go test (integration)"
+	@go test -v -tags=integration ./...
+
 .PHONY: checks
 checks: test lint
 	@echo "▶ all checks passed"

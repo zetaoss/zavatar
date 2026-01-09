@@ -127,7 +127,8 @@ func TestLoad_MySQL_Validate(t *testing.T) {
 			"-mysql-port", "3307",
 			"-mysql-username", "u",
 			"-mysql-password", "p",
-			"-mysql-database", "d",
+			"-mysql-database", "pdb",
+			"-mysql-user-database", "udb",
 		})
 		require.NoError(t, err)
 		require.Equal(t, "mysql", cfg.DB.Driver)
