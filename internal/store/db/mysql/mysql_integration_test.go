@@ -32,11 +32,11 @@ func TestDB_Get_MySQL_LeftJoin_Defaults(t *testing.T) {
 
 	// Clean tables (safe)
 	_, _ = db.Exec("DROP TABLE IF EXISTS pdb.profiles")
-	_, _ = db.Exec("DROP TABLE IF EXISTS udb.user")
+	_, _ = db.Exec("DROP TABLE IF EXISTS udb.`user`")
 
 	// 2) Create user table in udb
 	_, err = db.Exec(`
-CREATE TABLE udb.user (
+CREATE TABLE udb.` + "`user`" + ` (
   user_id INT UNSIGNED NOT NULL AUTO_INCREMENT,
   user_name VARBINARY(255) NOT NULL DEFAULT '',
   PRIMARY KEY (user_id),
@@ -55,13 +55,20 @@ CREATE TABLE pdb.profiles (
 	require.NoError(t, err)
 
 	// 4) Insert user only (no profile)
-	_, err = db.Exec("INSERT INTO udb.user (user_id, user_name) VALUES (42, 'Testuser')")
+	_, err = db.Exec("INSERT INTO udb.`user` (user_id, user_name) VALUES (42, 'Testuser')")
+	require.NoError(t, err)
+
+	qpdb, err := quoteIdent("pdb")
+	require.NoError(t, err)
+	qudb, err := quoteIdent("udb")
 	require.NoError(t, err)
 
 	store := &DB{
-		db:           db,
-		database:     "pdb",
-		userDatabase: "udb",
+		db:                 db,
+		database:           "pdb",
+		userDatabase:       "udb",
+		quotedDatabase:     qpdb,
+		quotedUserDatabase: qudb,
 	}
 
 	p, err := store.Get(ctx, 42)
@@ -72,7 +79,7 @@ CREATE TABLE pdb.profiles (
 	require.Equal(t, "", p.GHash)
 
 	// 5) Insert user + profile
-	_, err = db.Exec("INSERT INTO udb.user (user_id, user_name) VALUES (43, 'HasProfile')")
+	_, err = db.Exec("INSERT INTO udb.`user` (user_id, user_name) VALUES (43, 'HasProfile')")
 	require.NoError(t, err)
 
 	_, err = db.Exec("INSERT INTO pdb.profiles (user_id, t, ghash) VALUES (43, 2, 'abcd1234abcd1234abcd1234abcd1234')")

@@ -6,16 +6,22 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
-	"unicode"
 
 	"github.com/zetaoss/zavatar/internal/domain"
 )
 
 type DB struct {
-	db           *sql.DB
+	db *sql.DB
+
+	// raw
 	database     string
 	userDatabase string
+
+	// quoted & validated (computed once in New)
+	quotedDatabase     string
+	quotedUserDatabase string
 }
 
 type Config struct {
@@ -29,13 +35,6 @@ type Config struct {
 }
 
 func New(cfg Config) (*DB, error) {
-	if cfg.Database == "" {
-		return nil, fmt.Errorf("mysql: Database is required")
-	}
-	if cfg.UserDatabase == "" {
-		return nil, fmt.Errorf("mysql: UserDatabase is required")
-	}
-
 	dsn := formatDSN(cfg.Username, cfg.Password, cfg.Host, cfg.Port, cfg.Database)
 
 	db, err := sql.Open("mysql", dsn)
@@ -52,10 +51,23 @@ func New(cfg Config) (*DB, error) {
 		return nil, fmt.Errorf("mysql: ping failed: %w", err)
 	}
 
+	qdb, err := quoteIdent(cfg.Database)
+	if err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("mysql: invalid Database: %w", err)
+	}
+	qudb, err := quoteIdent(cfg.UserDatabase)
+	if err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("mysql: invalid UserDatabase: %w", err)
+	}
+
 	d := &DB{
-		db:           db,
-		database:     cfg.Database,
-		userDatabase: cfg.UserDatabase,
+		db:                 db,
+		database:           cfg.Database,
+		userDatabase:       cfg.UserDatabase,
+		quotedDatabase:     qdb,
+		quotedUserDatabase: qudb,
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
@@ -70,19 +82,10 @@ func New(cfg Config) (*DB, error) {
 }
 
 func (d *DB) validateSchema(ctx context.Context) error {
-	udb, err := quoteIdent(d.userDatabase)
-	if err != nil {
-		return fmt.Errorf("mysql: invalid UserDatabase: %w", err)
-	}
-	pdb, err := quoteIdent(d.database)
-	if err != nil {
-		return fmt.Errorf("mysql: invalid Database: %w", err)
-	}
-
 	q := fmt.Sprintf(`
 SELECT u.user_name, p.t, p.ghash FROM %s.user u
 LEFT JOIN %s.profiles p ON p.user_id = u.user_id LIMIT 0
-`, udb, pdb)
+`, d.quotedUserDatabase, d.quotedDatabase)
 
 	rows, err := d.db.QueryContext(ctx, q)
 	if err != nil {
@@ -99,20 +102,11 @@ LEFT JOIN %s.profiles p ON p.user_id = u.user_id LIMIT 0
 func (d *DB) Close() error { return d.db.Close() }
 
 func (d *DB) Get(ctx context.Context, userID int64) (*domain.UserProfile, error) {
-	udb, err := quoteIdent(d.userDatabase)
-	if err != nil {
-		return nil, fmt.Errorf("mysql: invalid UserDatabase: %w", err)
-	}
-	pdb, err := quoteIdent(d.database)
-	if err != nil {
-		return nil, fmt.Errorf("mysql: invalid Database: %w", err)
-	}
-
 	q := fmt.Sprintf(`
 SELECT u.user_name, p.t, p.ghash FROM %s.user u
 LEFT JOIN %s.profiles p ON p.user_id = u.user_id
 WHERE u.user_id = ? LIMIT 1
-`, udb, pdb)
+`, d.quotedUserDatabase, d.quotedDatabase)
 
 	var (
 		userName []byte
@@ -120,7 +114,7 @@ WHERE u.user_id = ? LIMIT 1
 		ghash    sql.NullString
 	)
 
-	err = d.db.QueryRowContext(ctx, q, userID).Scan(&userName, &t, &ghash)
+	err := d.db.QueryRowContext(ctx, q, userID).Scan(&userName, &t, &ghash)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
@@ -137,12 +131,26 @@ WHERE u.user_id = ? LIMIT 1
 		Name: string(userName),
 		Type: mapProfileType(tt),
 	}
-
 	if ghash.Valid {
 		p.GHash = ghash.String
 	}
-
 	return p, nil
+}
+
+func quoteIdent(s string) (string, error) {
+	if s == "" {
+		return "", fmt.Errorf("empty identifier")
+	}
+	for _, r := range s {
+		if r == 0 {
+			return "", fmt.Errorf("identifier contains NUL")
+		}
+		if r < 0x20 || r == 0x7f {
+			return "", fmt.Errorf("identifier contains control char: %q", r)
+		}
+	}
+	escaped := strings.ReplaceAll(s, "`", "``")
+	return "`" + escaped + "`", nil
 }
 
 func mapProfileType(t int64) string {
@@ -156,27 +164,4 @@ func mapProfileType(t int64) string {
 	default:
 		return "letter"
 	}
-}
-
-func quoteIdent(s string) (string, error) {
-	if s == "" {
-		return "", fmt.Errorf("empty identifier")
-	}
-	for _, r := range s {
-		if !isIdentChar(r) {
-			return "", fmt.Errorf("invalid char in identifier: %q", r)
-		}
-	}
-	return "`" + s + "`", nil
-}
-
-func isIdentChar(r rune) bool {
-	if r > unicode.MaxASCII {
-		return false
-	}
-	return r == '_' ||
-		r == '$' ||
-		(r >= '0' && r <= '9') ||
-		(r >= 'A' && r <= 'Z') ||
-		(r >= 'a' && r <= 'z')
 }

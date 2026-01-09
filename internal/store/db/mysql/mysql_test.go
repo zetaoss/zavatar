@@ -44,9 +44,11 @@ func TestDB_Get_SQLMock_ProfileExists(t *testing.T) {
 	t.Cleanup(func() { _ = sqlDB.Close() })
 
 	store := &DB{
-		db:           sqlDB,
-		database:     "db",
-		userDatabase: "udb",
+		db:                 sqlDB,
+		database:           "db",
+		userDatabase:       "udb",
+		quotedDatabase:     "`db`",
+		quotedUserDatabase: "`udb`",
 	}
 
 	const q = `
@@ -81,9 +83,11 @@ func TestDB_Get_SQLMock_ProfileMissing_Defaults(t *testing.T) {
 	t.Cleanup(func() { _ = sqlDB.Close() })
 
 	store := &DB{
-		db:           sqlDB,
-		database:     "db",
-		userDatabase: "udb",
+		db:                 sqlDB,
+		database:           "db",
+		userDatabase:       "udb",
+		quotedDatabase:     "`db`",
+		quotedUserDatabase: "`udb`",
 	}
 
 	const q = `
@@ -118,9 +122,11 @@ func TestDB_Get_SQLMock_UserMissing_ReturnsNil(t *testing.T) {
 	t.Cleanup(func() { _ = sqlDB.Close() })
 
 	store := &DB{
-		db:           sqlDB,
-		database:     "db",
-		userDatabase: "udb",
+		db:                 sqlDB,
+		database:           "db",
+		userDatabase:       "udb",
+		quotedDatabase:     "`db`",
+		quotedUserDatabase: "`udb`",
 	}
 
 	const q = `
