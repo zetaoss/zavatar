@@ -1,5 +1,4 @@
 // internal/store/db/mysql/mysql_test.go
-// internal/store/db/mysql/mysql_test.go
 package mysql
 
 import (
@@ -44,11 +43,15 @@ func TestDB_Get_SQLMock_ProfileExists(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = sqlDB.Close() })
 
-	store := &DB{db: sqlDB}
+	store := &DB{
+		db:           sqlDB,
+		database:     "db",
+		userDatabase: "udb",
+	}
 
 	const q = `
-SELECT u.user_name, p.t, p.ghash FROM user u
-LEFT JOIN profiles p ON p.user_id = u.user_id
+SELECT u.user_name, p.t, p.ghash FROM ` + "`udb`" + `.user u
+LEFT JOIN ` + "`db`" + `.profiles p ON p.user_id = u.user_id
 WHERE u.user_id = ? LIMIT 1
 `
 
@@ -77,11 +80,15 @@ func TestDB_Get_SQLMock_ProfileMissing_Defaults(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = sqlDB.Close() })
 
-	store := &DB{db: sqlDB}
+	store := &DB{
+		db:           sqlDB,
+		database:     "db",
+		userDatabase: "udb",
+	}
 
 	const q = `
-SELECT u.user_name, p.t, p.ghash FROM user u
-LEFT JOIN profiles p ON p.user_id = u.user_id
+SELECT u.user_name, p.t, p.ghash FROM ` + "`udb`" + `.user u
+LEFT JOIN ` + "`db`" + `.profiles p ON p.user_id = u.user_id
 WHERE u.user_id = ? LIMIT 1
 `
 
@@ -110,11 +117,15 @@ func TestDB_Get_SQLMock_UserMissing_ReturnsNil(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = sqlDB.Close() })
 
-	store := &DB{db: sqlDB}
+	store := &DB{
+		db:           sqlDB,
+		database:     "db",
+		userDatabase: "udb",
+	}
 
 	const q = `
-SELECT u.user_name, p.t, p.ghash FROM user u
-LEFT JOIN profiles p ON p.user_id = u.user_id
+SELECT u.user_name, p.t, p.ghash FROM ` + "`udb`" + `.user u
+LEFT JOIN ` + "`db`" + `.profiles p ON p.user_id = u.user_id
 WHERE u.user_id = ? LIMIT 1
 `
 

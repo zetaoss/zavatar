@@ -1,3 +1,4 @@
+// internal/store/db/mysql/dsn.go
 package mysql
 
 import (

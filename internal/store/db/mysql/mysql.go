@@ -7,24 +7,35 @@ import (
 	"errors"
 	"fmt"
 	"time"
+	"unicode"
 
 	"github.com/zetaoss/zavatar/internal/domain"
 )
 
 type DB struct {
-	db *sql.DB
+	db           *sql.DB
+	database     string
+	userDatabase string
 }
 
 type Config struct {
-	Host     string
-	Port     int
-	Username string
-	Password string
-	Database string
-	Params   string
+	Host         string
+	Port         int
+	Username     string
+	Password     string
+	Database     string
+	UserDatabase string
+	Params       string
 }
 
 func New(cfg Config) (*DB, error) {
+	if cfg.Database == "" {
+		return nil, fmt.Errorf("mysql: Database is required")
+	}
+	if cfg.UserDatabase == "" {
+		return nil, fmt.Errorf("mysql: UserDatabase is required")
+	}
+
 	dsn := formatDSN(cfg.Username, cfg.Password, cfg.Host, cfg.Port, cfg.Database)
 
 	db, err := sql.Open("mysql", dsn)
@@ -41,7 +52,11 @@ func New(cfg Config) (*DB, error) {
 		return nil, fmt.Errorf("mysql: ping failed: %w", err)
 	}
 
-	d := &DB{db: db}
+	d := &DB{
+		db:           db,
+		database:     cfg.Database,
+		userDatabase: cfg.UserDatabase,
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
@@ -55,10 +70,20 @@ func New(cfg Config) (*DB, error) {
 }
 
 func (d *DB) validateSchema(ctx context.Context) error {
-	const q = `
-SELECT u.user_name, p.t, p.ghash FROM user u
-LEFT JOIN profiles p ON p.user_id = u.user_id LIMIT 0
-`
+	udb, err := quoteIdent(d.userDatabase)
+	if err != nil {
+		return fmt.Errorf("mysql: invalid UserDatabase: %w", err)
+	}
+	pdb, err := quoteIdent(d.database)
+	if err != nil {
+		return fmt.Errorf("mysql: invalid Database: %w", err)
+	}
+
+	q := fmt.Sprintf(`
+SELECT u.user_name, p.t, p.ghash FROM %s.user u
+LEFT JOIN %s.profiles p ON p.user_id = u.user_id LIMIT 0
+`, udb, pdb)
+
 	rows, err := d.db.QueryContext(ctx, q)
 	if err != nil {
 		return fmt.Errorf("mysql: invalid schema (user/profiles): %w", err)
@@ -74,11 +99,20 @@ LEFT JOIN profiles p ON p.user_id = u.user_id LIMIT 0
 func (d *DB) Close() error { return d.db.Close() }
 
 func (d *DB) Get(ctx context.Context, userID int64) (*domain.UserProfile, error) {
-	const q = `
-SELECT u.user_name, p.t, p.ghash FROM user u
-LEFT JOIN profiles p ON p.user_id = u.user_id
+	udb, err := quoteIdent(d.userDatabase)
+	if err != nil {
+		return nil, fmt.Errorf("mysql: invalid UserDatabase: %w", err)
+	}
+	pdb, err := quoteIdent(d.database)
+	if err != nil {
+		return nil, fmt.Errorf("mysql: invalid Database: %w", err)
+	}
+
+	q := fmt.Sprintf(`
+SELECT u.user_name, p.t, p.ghash FROM %s.user u
+LEFT JOIN %s.profiles p ON p.user_id = u.user_id
 WHERE u.user_id = ? LIMIT 1
-`
+`, udb, pdb)
 
 	var (
 		userName []byte
@@ -86,7 +120,7 @@ WHERE u.user_id = ? LIMIT 1
 		ghash    sql.NullString
 	)
 
-	err := d.db.QueryRowContext(ctx, q, userID).Scan(&userName, &t, &ghash)
+	err = d.db.QueryRowContext(ctx, q, userID).Scan(&userName, &t, &ghash)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
@@ -122,4 +156,27 @@ func mapProfileType(t int64) string {
 	default:
 		return "letter"
 	}
+}
+
+func quoteIdent(s string) (string, error) {
+	if s == "" {
+		return "", fmt.Errorf("empty identifier")
+	}
+	for _, r := range s {
+		if !isIdentChar(r) {
+			return "", fmt.Errorf("invalid char in identifier: %q", r)
+		}
+	}
+	return "`" + s + "`", nil
+}
+
+func isIdentChar(r rune) bool {
+	if r > unicode.MaxASCII {
+		return false
+	}
+	return r == '_' ||
+		r == '$' ||
+		(r >= '0' && r <= '9') ||
+		(r >= 'A' && r <= 'Z') ||
+		(r >= 'a' && r <= 'z')
 }
