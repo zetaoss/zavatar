@@ -71,11 +71,11 @@ GET /u/{uid}?s={size}&t={type}
 
 ```env
 ADDR=:8080
-SITE_SALT=example.com
-PURGE_KEY=xxxx
 BASE_URL=avatars.example.com
-CF_ZONE_ID=xxxx
 CF_API_TOKEN=xxxx
+CF_ZONE_ID=xxxx
+INTERNAL_KEY=xxxx
+SITE_SALT=example.com
 ```
 
 ### Storage
@@ -94,7 +94,7 @@ R2_PREFIX=v1/
 ### Database
 
 ```env
-DB_DRIVER=fake              # default
+DB_DRIVER=memory            # default
 
 DB_DRIVER=mysql
 MYSQL_HOST=127.0.0.1

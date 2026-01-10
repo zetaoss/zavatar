@@ -14,11 +14,11 @@ func Load(args []string) (Config, error) {
 
 	// Server
 	addr := fs.String("addr", ":8080", "listen address, e.g. :8080 (env: ADDR)")
-	siteSalt := fs.String("site-salt", "example.com", "avatar site salt (env: SITE_SALT)")
-	purgeKey := fs.String("purge-key", "", "purge key (env: PURGE_KEY)")
 	baseURL := fs.String("base-url", "", "public base url, e.g. https://avatars.example.com (env: BASE_URL)")
-	cfZoneID := fs.String("cf-zone-id", "", "cloudflare zone id (env: CF_ZONE_ID)")
 	cfAPIToken := fs.String("cf-api-token", "", "cloudflare api token (env: CF_API_TOKEN)")
+	cfZoneID := fs.String("cf-zone-id", "", "cloudflare zone id (env: CF_ZONE_ID)")
+	internalKey := fs.String("internal-key", "", "internal key (env: INTERNAL_KEY)")
+	siteSalt := fs.String("site-salt", "example.com", "avatar site salt (env: SITE_SALT)")
 
 	// Drivers
 	storageDriver := fs.String("storage-driver", "filesystem", "storage driver: filesystem|r2 (env: STORAGE_DRIVER)")
@@ -44,10 +44,10 @@ func Load(args []string) (Config, error) {
 	}
 
 	cfg := Config{
-		Addr:     strings.TrimSpace(*addr),
-		SiteSalt: strings.TrimSpace(*siteSalt),
-		PurgeKey: strings.TrimSpace(*purgeKey),
-		BaseURL:  strings.TrimSpace(*baseURL),
+		Addr:        strings.TrimSpace(*addr),
+		BaseURL:     strings.TrimSpace(*baseURL),
+		InternalKey: strings.TrimSpace(*internalKey),
+		SiteSalt:    strings.TrimSpace(*siteSalt),
 		Cloudflare: CloudflareConfig{
 			ZoneID:   strings.TrimSpace(*cfZoneID),
 			APIToken: strings.TrimSpace(*cfAPIToken),
@@ -83,6 +83,12 @@ func Load(args []string) (Config, error) {
 }
 
 func normalize(cfg *Config) {
+	cfg.Addr = strings.TrimSpace(cfg.Addr)
+
+	cfg.BaseURL = strings.TrimSpace(cfg.BaseURL)
+
+	cfg.InternalKey = strings.TrimSpace(cfg.InternalKey)
+
 	cfg.SiteSalt = strings.TrimSpace(cfg.SiteSalt)
 	if cfg.SiteSalt == "" {
 		cfg.SiteSalt = "example.com"
@@ -121,22 +127,22 @@ func validate(cfg Config) error {
 	case "mysql":
 		m := cfg.DB.MySQL
 		if m.Host == "" {
-			return fmt.Errorf("mysql: missing required config host")
+			return fmt.Errorf("mysql: missing MYSQL_HOST")
 		}
 		if m.Port == 0 {
-			return fmt.Errorf("mysql: missing required config port")
+			return fmt.Errorf("mysql: missing MYSQL_PORT")
 		}
 		if m.Username == "" {
-			return fmt.Errorf("mysql: missing required config username")
+			return fmt.Errorf("mysql: missing MYSQL_USERNAME")
 		}
 		if m.Password == "" {
-			return fmt.Errorf("mysql: missing required config password")
+			return fmt.Errorf("mysql: missing MYSQL_PASSWORD")
 		}
 		if m.Database == "" {
-			return fmt.Errorf("mysql: missing required config database")
+			return fmt.Errorf("mysql: missing MYSQL_DATABASE")
 		}
 		if m.UserDatabase == "" {
-			return fmt.Errorf("mysql: missing required config user database")
+			return fmt.Errorf("mysql: missing MYSQL_USER_DATABASE")
 		}
 		return nil
 	default:

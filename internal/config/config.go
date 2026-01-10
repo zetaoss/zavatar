@@ -2,10 +2,10 @@
 package config
 
 type Config struct {
-	Addr     string // env: ADDR
-	SiteSalt string // env: SITE_SALT
-	PurgeKey string // env: PURGE_KEY
-	BaseURL  string // env: BASE_URL
+	Addr        string // env: ADDR
+	BaseURL     string // env: BASE_URL
+	InternalKey string // env: INTERNAL_KEY
+	SiteSalt    string // env: SITE_SALT
 
 	Cloudflare CloudflareConfig
 	Storage    StorageConfig

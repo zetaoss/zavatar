@@ -50,9 +50,9 @@ func Run(c Config) error {
 	defer avatarSvc.Close()
 
 	avatarH := handler.NewAvatarHandler(avatarSvc)
-	purgeH := handler.NewPurgeHandler(avatarSvc, cfg.PurgeKey)
+	internalH := handler.NewInternalHandler(avatarSvc, cfg.InternalKey)
 
-	h := router(avatarH, purgeH)
+	h := router(avatarH, internalH)
 
 	srv := &http.Server{
 		Addr:    cfg.Addr,

@@ -142,7 +142,7 @@ func TestLoad_MySQL_Validate(t *testing.T) {
 			"-mysql-host", "127.0.0.1",
 		})
 		require.Error(t, err)
-		require.Contains(t, err.Error(), "mysql: missing required config")
+		require.Contains(t, err.Error(), "mysql: missing MYSQL_USERNAME")
 	})
 }
 
