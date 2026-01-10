@@ -92,16 +92,18 @@ func (s *AvatarService) Resolve(ctx context.Context, in ResolveInput) (*ResolveO
 		return nil, storage.ErrNotFound
 	}
 
-	typ := strings.TrimSpace(prof.Type)
+	typ := domain.NormalizeAvatarType(prof.Type)
+
 	if isPreview {
-		typ = mapProfileType(in.T)
-	}
-	if typ == "" {
-		typ = "letter"
+		typ = domain.AvatarTypeFromCode(domain.AvatarTypeCode(in.T))
 	}
 
 	if isPreview {
-		sfKey := fmt.Sprintf("preview|type=%s|uid=%d|s=%d", typ, in.UserID, sizeEff)
+		sfKey := fmt.Sprintf(
+			"preview|type=%s|uid=%d|s=%d",
+			typ, in.UserID, sizeEff,
+		)
+
 		b, err := s.sfBytes(sfKey, func() ([]byte, error) {
 			png, _, e := s.renderAt(ctx, prof, typ, in.UserID, sizeEff)
 			return png, e
@@ -109,6 +111,7 @@ func (s *AvatarService) Resolve(ctx context.Context, in ResolveInput) (*ResolveO
 		if err != nil {
 			return nil, err
 		}
+
 		return &ResolveOutput{
 			PNG:          b,
 			CacheControl: cachePreview,
@@ -134,7 +137,11 @@ func (s *AvatarService) Resolve(ctx context.Context, in ResolveInput) (*ResolveO
 		stable bool
 	}
 
-	sfKey := fmt.Sprintf("official|type=%s|uid=%d|s=%d", typ, in.UserID, sizeEff)
+	sfKey := fmt.Sprintf(
+		"official|type=%s|uid=%d|s=%d",
+		typ, in.UserID, sizeEff,
+	)
+
 	v, err, _ := s.sf.Do(sfKey, func() (any, error) {
 		if bb, e := s.storage.Get(ctx, officialKey); e == nil {
 			return genRes{png: bb, stable: true}, nil
@@ -183,33 +190,20 @@ func (s *AvatarService) sfBytes(key string, fn func() ([]byte, error)) ([]byte, 
 	return b, nil
 }
 
-func mapProfileType(t int) string {
-	switch t {
-	case 2:
-		return "identicon"
-	case 3:
-		return "gravatar"
-	case 1:
-		fallthrough
-	default:
-		return "letter"
-	}
-}
-
-func (s *AvatarService) renderAt(ctx context.Context, prof *domain.UserProfile, typ string, userID int64, size int) ([]byte, bool, error) {
+func (s *AvatarService) renderAt(ctx context.Context, prof *domain.UserProfile, typ domain.AvatarType, userID int64, size int) ([]byte, bool, error) {
 	log := zlog.Ctx(ctx)
 
 	switch typ {
-	case "identicon":
-		b, e := render.IdenticonPNG(s.siteSalt, userID, size)
+	case domain.AvatarTypeLetter:
+		name := safeName(prof.Name, userID)
+		b, e := render.LetterPNG(s.siteSalt, name, size)
 		return b, true, e
 
-	case "gravatar":
+	case domain.AvatarTypeGravatar:
 		gh := strings.TrimSpace(prof.GHash)
 		if gh == "" {
-			name := safeName(prof.Name, userID)
-			b, e := render.LetterPNG(s.siteSalt, name, size)
-			return b, true, e
+			fb, fe := render.IdenticonPNG(s.siteSalt, userID, size)
+			return fb, false, fe
 		}
 
 		url := render.GravatarURL(gh, size)
@@ -219,20 +213,18 @@ func (s *AvatarService) renderAt(ctx context.Context, prof *domain.UserProfile, 
 		}
 
 		if storage.IsNotFound(e) {
-			log.Debug("gravatar not found, fallback to letter")
+			log.Debug("gravatar not found, fallback to identicon")
 		} else {
-			log.Warn("gravatar fetch error, fallback to letter", "err", e)
+			log.Warn("gravatar fetch error, fallback to identicon", "err", e)
 		}
 
-		name := safeName(prof.Name, userID)
-		fb, fe := render.LetterPNG(s.siteSalt, name, size)
+		fb, fe := render.IdenticonPNG(s.siteSalt, userID, size)
 		return fb, false, fe
 
-	case "letter":
+	case domain.AvatarTypeIdenticon:
 		fallthrough
 	default:
-		name := safeName(prof.Name, userID)
-		b, e := render.LetterPNG(s.siteSalt, name, size)
+		b, e := render.IdenticonPNG(s.siteSalt, userID, size)
 		return b, true, e
 	}
 }

@@ -1,3 +1,4 @@
+## Makefile
 GOLANGCI_LINT_VERSION := v2.7.2
 RCLONE_BIN := /usr/local/bin/rclone
 SHELL := /bin/bash
@@ -6,19 +7,19 @@ SHELL := /bin/bash
 run-dev:
 	@rm -rf ./data
 	@echo "▶ running"
-	go run ./cmd/zavatar
+	LOG_LEVEL=debug go run ./cmd/zavatar
 
 .PHONY: run-dev-r2
 run-dev-r2:
 	@echo "▶ running with .env.r2"
 	@set -a; . ./.env.r2; set +a; \
-	go run ./cmd/zavatar
+	LOG_LEVEL=debug go run ./cmd/zavatar
 
 .PHONY: run-dev-mysql
 run-dev-mysql:
 	@echo "▶ running with .env.mysql"
 	@set -a; . ./.env.mysql; set +a; \
-	go run ./cmd/zavatar
+	LOG_LEVEL=debug go run ./cmd/zavatar
 
 .PHONY: url
 url:
@@ -28,14 +29,15 @@ url:
 	@echo " (open in browser)"
 	@echo "=========================================="
 	@echo ""
-	@echo "letter (uid=1, s=40)               http://localhost:8080/u/1?s=40"
-	@echo "identicon (uid=2, s=200->norm)     http://localhost:8080/u/2?s=200"
-	@echo "gravatar (uid=3, s=40)             http://localhost:8080/u/3?s=40"
-	@echo "letter large (uid=1, s=320)        http://localhost:8080/u/1?s=320"
+	@echo "identicon (uid=1, s=40)                http://localhost:8080/u/1?s=40"
+	@echo "letter (uid=2, s=200)                  http://localhost:8080/u/2?s=200"
+	@echo "gravatar (uid=3, s=40)                 http://localhost:8080/u/3?s=40"
+	@echo "identicon large (uid=1, s=320)         http://localhost:8080/u/1?s=320"
 	@echo ""
-	@echo "preview identicon (uid=1, t=2)     http://localhost:8080/u/1?s=40&t=2"
-	@echo "preview gravatar (uid=3, t=3)      http://localhost:8080/u/3?s=80&t=3"
-	@echo "preview gravatar->letter fallback  http://localhost:8080/u/1?s=80&t=3"
+	@echo "preview letter (uid=1, t=2)            http://localhost:8080/u/1?s=40&t=2"
+	@echo "preview gravatar (exists)              http://localhost:8080/u/3?s=80&t=3"
+	@echo "preview gravatar (missing)->identicon  http://localhost:8080/u/1?s=80&t=3"
+
 
 PURGE_KEY = secret
 
@@ -70,14 +72,10 @@ lint-install:
 
 .PHONY: test
 test:
-	@echo "▶ go test"
+	@echo "▶ go test (unit)"
 	@go test -v ./...
 
-.PHONY: test-integration
-test-integration:
-	@echo "▶ go test (integration)"
+.PHONY: test-all
+test-all:
+	@echo "▶ go test (unit + integration)"
 	@go test -v -tags=integration ./...
-
-.PHONY: checks
-checks: test lint
-	@echo "▶ all checks passed"

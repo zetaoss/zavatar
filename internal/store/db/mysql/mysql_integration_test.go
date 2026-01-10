@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	tc "github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
+	"github.com/zetaoss/zavatar/internal/domain"
 )
 
 func TestDB_Get_MySQL_LeftJoin_Defaults(t *testing.T) {
@@ -75,7 +76,7 @@ CREATE TABLE pdb.profiles (
 	require.NoError(t, err)
 	require.NotNil(t, p)
 	require.Equal(t, "Testuser", p.Name)
-	require.Equal(t, "letter", p.Type)
+	require.Equal(t, domain.AvatarTypeIdenticon, p.Type)
 	require.Equal(t, "", p.GHash)
 
 	// 5) Insert user + profile
@@ -89,7 +90,7 @@ CREATE TABLE pdb.profiles (
 	require.NoError(t, err)
 	require.NotNil(t, p2)
 	require.Equal(t, "HasProfile", p2.Name)
-	require.Equal(t, "identicon", p2.Type)
+	require.Equal(t, domain.AvatarTypeLetter, p2.Type)
 	require.Equal(t, "abcd1234abcd1234abcd1234abcd1234", p2.GHash)
 }
 
