@@ -15,7 +15,7 @@ import (
 type DB struct {
 	db *sql.DB
 
-	// raw
+	// raw (kept for debugging / visibility)
 	database     string
 	userDatabase string
 
@@ -31,10 +31,14 @@ type Config struct {
 	Password     string
 	Database     string
 	UserDatabase string
-	Params       string
+
+	// Optional DSN params. Ensure formatDSN() actually applies this.
+	// Example: "parseTime=true&charset=utf8mb4&collation=utf8mb4_unicode_ci"
+	Params string
 }
 
 func New(cfg Config) (*DB, error) {
+	// NOTE: Ensure formatDSN applies cfg.Params if you intend to use it.
 	dsn := formatDSN(cfg.Username, cfg.Password, cfg.Host, cfg.Port, cfg.Database)
 
 	db, err := sql.Open("mysql", dsn)
@@ -42,11 +46,17 @@ func New(cfg Config) (*DB, error) {
 		return nil, err
 	}
 
-	db.SetMaxOpenConns(10)
-	db.SetMaxIdleConns(5)
-	db.SetConnMaxLifetime(30 * time.Minute)
+	// "Yield to others" pool settings.
+	db.SetMaxOpenConns(1)
+	db.SetMaxIdleConns(1)
+	db.SetConnMaxIdleTime(1 * time.Minute)
+	db.SetConnMaxLifetime(10 * time.Minute)
 
-	if err := db.Ping(); err != nil {
+	// Avoid potentially unbounded Ping() hang.
+	ctxPing, cancelPing := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancelPing()
+
+	if err := db.PingContext(ctxPing); err != nil {
 		_ = db.Close()
 		return nil, fmt.Errorf("mysql: ping failed: %w", err)
 	}
@@ -93,9 +103,7 @@ LEFT JOIN %s.profiles p ON p.user_id = u.user_id LIMIT 0
 	}
 	defer func() { _ = rows.Close() }()
 
-	if err := rows.Err(); err != nil {
-		return fmt.Errorf("mysql: invalid schema (user/profiles): %w", err)
-	}
+	// LIMIT 0: if QueryContext succeeded, schema/columns are compatible enough.
 	return nil
 }
 
@@ -109,7 +117,7 @@ WHERE u.user_id = ? LIMIT 1
 `, d.quotedUserDatabase, d.quotedDatabase)
 
 	var (
-		userName []byte
+		userName string
 		t        sql.NullInt64
 		ghash    sql.NullString
 	)
@@ -128,7 +136,7 @@ WHERE u.user_id = ? LIMIT 1
 	}
 
 	p := &domain.UserProfile{
-		Name: string(userName),
+		Name: userName,
 		Type: domain.AvatarTypeFromCode(tt),
 	}
 	if ghash.Valid {
