@@ -79,3 +79,6 @@ test:
 test-all:
 	@echo "▶ go test (unit + integration)"
 	@go test -v -tags=integration ./...
+
+.PHONY: checks
+checks: test-all lint
