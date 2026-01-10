@@ -22,7 +22,10 @@ type InternalHandler struct {
 }
 
 func NewInternalHandler(svc *service.AvatarService, internalKey string) *InternalHandler {
-	return &InternalHandler{svc, internalKey}
+	return &InternalHandler{
+		svc:         svc,
+		internalKey: internalKey,
+	}
 }
 
 type purgeResp struct {
