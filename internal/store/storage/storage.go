@@ -15,4 +15,5 @@ func IsNotFound(err error) bool {
 type Storage interface {
 	Get(ctx context.Context, key string) ([]byte, error)
 	Put(ctx context.Context, key string, contentType string, body []byte) error
+	Delete(ctx context.Context, key string) error
 }

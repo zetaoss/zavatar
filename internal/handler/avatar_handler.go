@@ -1,10 +1,11 @@
-// internal/handler/avatar.go
+// internal/handler/avatar_handler.go
 package handler
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"log"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -14,6 +15,7 @@ import (
 	"github.com/zetaoss/zavatar/internal/domain"
 	"github.com/zetaoss/zavatar/internal/service"
 	"github.com/zetaoss/zavatar/internal/store/storage"
+	"github.com/zetaoss/zavatar/internal/zlog"
 )
 
 type AvatarHandler struct {
@@ -35,15 +37,17 @@ func (h *AvatarHandler) GetAvatar(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	sizeEff := domain.NormalizeSizeQuery(q.Get("s"))
 
+	tStr := q.Get("t")
 	t := 0
-	if ts := q.Get("t"); ts != "" {
-		tv, e := strconv.Atoi(ts)
-		if e != nil {
+	if tStr != "" {
+		t, err = strconv.Atoi(tStr)
+		if err != nil {
 			http.Error(w, "bad t", http.StatusBadRequest)
 			return
 		}
-		t = tv
 	}
+
+	log := zlog.Ctx(r.Context()).With("uid", uid, "s", sizeEff, "t", t)
 
 	out, err := h.svc.Resolve(r.Context(), service.ResolveInput{
 		UserID: uid,
@@ -55,7 +59,19 @@ func (h *AvatarHandler) GetAvatar(w http.ResponseWriter, r *http.Request) {
 			http.NotFound(w, r)
 			return
 		}
-		log.Printf("AvatarHandler.GetAvatar: resolve failed: %v", err)
+
+		if errors.Is(err, context.Canceled) {
+			log.Debug("canceled")
+			return
+		}
+
+		if errors.Is(err, context.DeadlineExceeded) {
+			log.Warn("timeout")
+			http.Error(w, "timeout", http.StatusGatewayTimeout)
+			return
+		}
+
+		log.Error("resolve failed", "err", err)
 		http.Error(w, "resolve failed", http.StatusInternalServerError)
 		return
 	}
@@ -90,13 +106,7 @@ func matchIfNoneMatch(ifNoneMatch string, etag string) bool {
 	parts := strings.Split(ifNoneMatch, ",")
 	for _, p := range parts {
 		tok := strings.TrimSpace(p)
-		if tok == "" {
-			continue
-		}
-		if tok == etag {
-			return true
-		}
-		if strings.HasPrefix(tok, "W/") && strings.TrimSpace(tok[2:]) == etag {
+		if tok == etag || (strings.HasPrefix(tok, "W/") && strings.TrimSpace(tok[2:]) == etag) {
 			return true
 		}
 	}

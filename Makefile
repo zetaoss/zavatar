@@ -37,6 +37,20 @@ url:
 	@echo "preview gravatar (uid=3, t=3)      http://localhost:8080/u/3?s=80&t=3"
 	@echo "preview gravatar->letter fallback  http://localhost:8080/u/1?s=80&t=3"
 
+PURGE_KEY = secret
+
+.PHONY: purge
+purge:
+	@echo ""
+	@echo "=========================================="
+	@echo " zavatar purge test"
+	@echo "=========================================="
+	@echo ""
+	@echo "purge official avatars for uid=1"
+	@echo ""
+	@curl -X POST -H "X-Purge-Key: $(PURGE_KEY)" http://localhost:8080/internal/purge/u/1
+	@echo ""
+
 .PHONY: lint
 lint: lint-install
 	@echo "▶ golangci-lint"

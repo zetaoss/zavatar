@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"mime"
 	"net/http"
 	"strings"
@@ -13,9 +14,11 @@ import (
 	"golang.org/x/sync/singleflight"
 
 	"github.com/zetaoss/zavatar/internal/domain"
+	"github.com/zetaoss/zavatar/internal/infra/cloudflare"
 	"github.com/zetaoss/zavatar/internal/render"
 	"github.com/zetaoss/zavatar/internal/store/db"
 	"github.com/zetaoss/zavatar/internal/store/storage"
+	"github.com/zetaoss/zavatar/internal/zlog"
 )
 
 const (
@@ -31,19 +34,32 @@ type AvatarService struct {
 	db       db.DB
 	siteSalt string
 
-	sf singleflight.Group
+	baseURL     string
+	batchPurger *cloudflare.BatchPurger
 
+	sf         singleflight.Group
 	httpClient *http.Client
 }
 
-func NewAvatarService(st storage.Storage, d db.DB, siteSalt string) *AvatarService {
+func NewAvatarService(st storage.Storage, d db.DB, siteSalt string, baseURL string, purger cloudflare.Purger) *AvatarService {
+	baseURL = strings.TrimRight(baseURL, "/")
+
+	bp := cloudflare.NewBatchPurger(purger, slog.Default())
 	return &AvatarService{
-		storage:  st,
-		db:       d,
-		siteSalt: siteSalt,
+		storage:     st,
+		db:          d,
+		siteSalt:    siteSalt,
+		baseURL:     baseURL,
+		batchPurger: bp,
 		httpClient: &http.Client{
 			Timeout: 3 * time.Second,
 		},
+	}
+}
+
+func (s *AvatarService) Close() {
+	if s.batchPurger != nil {
+		s.batchPurger.Close()
 	}
 }
 
@@ -62,6 +78,8 @@ func (s *AvatarService) Resolve(ctx context.Context, in ResolveInput) (*ResolveO
 	if in.UserID <= 0 {
 		return nil, fmt.Errorf("bad user_id")
 	}
+
+	log := zlog.Ctx(ctx)
 
 	sizeEff := domain.NormalizeSizeInt(in.Size)
 	isPreview := in.T != 0
@@ -83,7 +101,7 @@ func (s *AvatarService) Resolve(ctx context.Context, in ResolveInput) (*ResolveO
 	}
 
 	if isPreview {
-		sfKey := fmt.Sprintf("official|uid=%d|s=%d", in.UserID, sizeEff)
+		sfKey := fmt.Sprintf("preview|type=%s|uid=%d|s=%d", typ, in.UserID, sizeEff)
 		b, err := s.sfBytes(sfKey, func() ([]byte, error) {
 			png, _, e := s.renderAt(ctx, prof, typ, in.UserID, sizeEff)
 			return png, e
@@ -100,6 +118,7 @@ func (s *AvatarService) Resolve(ctx context.Context, in ResolveInput) (*ResolveO
 	officialKey := domain.KeyAvatar(in.UserID, sizeEff)
 
 	if b, err := s.storage.Get(ctx, officialKey); err == nil {
+		log.Debug("storage hit")
 		return &ResolveOutput{
 			PNG:          b,
 			CacheControl: cacheOfficial,
@@ -107,6 +126,8 @@ func (s *AvatarService) Resolve(ctx context.Context, in ResolveInput) (*ResolveO
 	} else if !storage.IsNotFound(err) {
 		return nil, err
 	}
+
+	log.Debug("storage miss, generating")
 
 	type genRes struct {
 		png    []byte
@@ -176,6 +197,8 @@ func mapProfileType(t int) string {
 }
 
 func (s *AvatarService) renderAt(ctx context.Context, prof *domain.UserProfile, typ string, userID int64, size int) ([]byte, bool, error) {
+	log := zlog.Ctx(ctx)
+
 	switch typ {
 	case "identicon":
 		b, e := render.IdenticonPNG(s.siteSalt, userID, size)
@@ -196,12 +219,14 @@ func (s *AvatarService) renderAt(ctx context.Context, prof *domain.UserProfile, 
 		}
 
 		if storage.IsNotFound(e) {
-			name := safeName(prof.Name, userID)
-			fb, fe := render.LetterPNG(s.siteSalt, name, size)
-			return fb, false, fe
+			log.Debug("gravatar not found, fallback to letter")
+		} else {
+			log.Warn("gravatar fetch error, fallback to letter", "err", e)
 		}
 
-		return nil, false, e
+		name := safeName(prof.Name, userID)
+		fb, fe := render.LetterPNG(s.siteSalt, name, size)
+		return fb, false, fe
 
 	case "letter":
 		fallthrough
@@ -227,6 +252,8 @@ func (s *AvatarService) fetchPNG(ctx context.Context, url string) ([]byte, error
 	}
 	req.Header.Set("Accept", "image/png,image/*;q=0.9,*/*;q=0.1")
 	req.Header.Set("User-Agent", "zavatar/1.0")
+
+	zlog.Ctx(ctx).Debug("fetching upstream", "url", url)
 
 	resp, err := s.httpClient.Do(req)
 	if err != nil {
@@ -258,4 +285,39 @@ func (s *AvatarService) fetchPNG(ctx context.Context, url string) ([]byte, error
 	}
 
 	return b, nil
+}
+
+func (s *AvatarService) Purge(ctx context.Context, userID int64) (int, error) {
+	if userID <= 0 {
+		return 0, fmt.Errorf("bad user_id")
+	}
+
+	prof, err := s.db.Get(ctx, userID)
+	if err != nil {
+		return 0, fmt.Errorf("db.Get err: %w", err)
+	}
+	if prof == nil {
+		return 0, storage.ErrNotFound
+	}
+
+	deleted := 0
+	for _, sz := range domain.PresetSizes {
+		key := domain.KeyAvatar(userID, sz)
+		err := s.storage.Delete(ctx, key)
+		if err == nil {
+			deleted++
+			continue
+		}
+		if storage.IsNotFound(err) {
+			continue
+		}
+		return deleted, err
+	}
+
+	if s.baseURL != "" && s.batchPurger != nil {
+		prefix := fmt.Sprintf("%s/u/%d", s.baseURL, userID)
+		s.batchPurger.Add(prefix)
+	}
+
+	return deleted, nil
 }

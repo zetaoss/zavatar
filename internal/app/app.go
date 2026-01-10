@@ -3,7 +3,7 @@ package app
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -12,7 +12,9 @@ import (
 
 	"github.com/zetaoss/zavatar/internal/config"
 	"github.com/zetaoss/zavatar/internal/handler"
+	"github.com/zetaoss/zavatar/internal/infra/cloudflare"
 	"github.com/zetaoss/zavatar/internal/service"
+	"github.com/zetaoss/zavatar/internal/zlog"
 )
 
 type Config struct {
@@ -21,17 +23,19 @@ type Config struct {
 }
 
 func Run(c Config) error {
+	zlog.Init()
+
+	slog.Info("zavatar start", "version", c.Version)
+
 	cfg, err := config.Load(c.Args)
 	if err != nil {
 		return err
 	}
 
-	log.Printf("zavatar %s", c.Version)
-
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	storage, err := wireStorage(ctx, cfg.Storage)
+	st, err := wireStorage(ctx, cfg.Storage)
 	if err != nil {
 		return err
 	}
@@ -40,9 +44,15 @@ func Run(c Config) error {
 		return err
 	}
 
-	avatarSvc := service.NewAvatarService(storage, db, cfg.SiteSalt)
+	cfPurger := cloudflare.NewClient(cfg.Cloudflare.ZoneID, cfg.Cloudflare.APIToken)
+
+	avatarSvc := service.NewAvatarService(st, db, cfg.SiteSalt, cfg.BaseURL, cfPurger)
+	defer avatarSvc.Close()
+
 	avatarH := handler.NewAvatarHandler(avatarSvc)
-	h := router(avatarH)
+	purgeH := handler.NewPurgeHandler(avatarSvc, cfg.PurgeKey)
+
+	h := router(avatarH, purgeH)
 
 	srv := &http.Server{
 		Addr:    cfg.Addr,
@@ -56,9 +66,9 @@ func Run(c Config) error {
 		_ = srv.Shutdown(shutdownCtx)
 	}()
 
-	log.Println("listening on", cfg.Addr)
-	if err := srv.ListenAndServe(); err == http.ErrServerClosed {
-		return nil
+	slog.Info("listening", "addr", cfg.Addr)
+	if err := srv.ListenAndServe(); err != http.ErrServerClosed {
+		return err
 	}
-	return err
+	return nil
 }

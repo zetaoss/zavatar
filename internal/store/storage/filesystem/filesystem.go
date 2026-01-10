@@ -4,7 +4,7 @@ package filesystem
 import (
 	"context"
 	"errors"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -21,7 +21,7 @@ type Storage struct{}
 
 func New() *Storage {
 	cwd, _ := os.Getwd()
-	log.Printf("[filesystem] cwd=%s, bucketDir=%s, prefix=%q", cwd, bucketDir, prefix)
+	slog.Info("filesystem storage", "cwd", cwd, "bucketDir", bucketDir, "prefix", prefix)
 	_ = os.MkdirAll(bucketDir, 0755)
 	return &Storage{}
 }
@@ -63,4 +63,17 @@ func (s *Storage) Put(_ context.Context, key string, _ string, body []byte) erro
 		return err
 	}
 	return os.WriteFile(path, body, 0644)
+}
+
+func (s *Storage) Delete(ctx context.Context, key string) error {
+	_ = ctx
+	p := s.path(key)
+
+	if err := os.Remove(p); err != nil {
+		if os.IsNotExist(err) {
+			return storage.ErrNotFound
+		}
+		return err
+	}
+	return nil
 }

@@ -102,6 +102,22 @@ func (s *Storage) Put(ctx context.Context, key string, contentType string, body 
 	return err
 }
 
+func (s *Storage) Delete(ctx context.Context, key string) error {
+	k := s.withPrefix(key)
+
+	_, err := s.s3.DeleteObject(ctx, &s3.DeleteObjectInput{
+		Bucket: aws.String(s.bucket),
+		Key:    aws.String(k),
+	})
+	if err != nil {
+		if isNotFound(err) {
+			return storage.ErrNotFound
+		}
+		return err
+	}
+	return nil
+}
+
 func isNotFound(err error) bool {
 	var nsk *s3types.NoSuchKey
 	if errors.As(err, &nsk) {

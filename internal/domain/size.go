@@ -5,10 +5,10 @@ import "strconv"
 
 const DefaultSize = 320
 
-var PersistentSizes = []int{16, 32, 64, 128, 320}
+var PresetSizes = []int{16, 32, 64, 128, 320}
 
 func maxSize() int {
-	return PersistentSizes[len(PersistentSizes)-1]
+	return PresetSizes[len(PresetSizes)-1]
 }
 
 func NormalizeSizeInt(req int) int {
@@ -16,7 +16,7 @@ func NormalizeSizeInt(req int) int {
 		return DefaultSize
 	}
 
-	for _, s := range PersistentSizes {
+	for _, s := range PresetSizes {
 		if req <= s {
 			return s
 		}

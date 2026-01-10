@@ -2,11 +2,19 @@
 package config
 
 type Config struct {
-	Addr     string
-	SiteSalt string // env: SITE_SALT (default: example.com)
+	Addr     string // env: ADDR
+	SiteSalt string // env: SITE_SALT
+	PurgeKey string // env: PURGE_KEY
+	BaseURL  string // env: BASE_URL
 
-	Storage StorageConfig
-	DB      DBConfig
+	Cloudflare CloudflareConfig
+	Storage    StorageConfig
+	DB         DBConfig
+}
+
+type CloudflareConfig struct {
+	ZoneID   string // env: CF_ZONE_ID
+	APIToken string // env: CF_API_TOKEN
 }
 
 type StorageConfig struct {

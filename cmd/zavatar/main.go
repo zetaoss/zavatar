@@ -2,7 +2,7 @@
 package main
 
 import (
-	"log"
+	"log/slog"
 	"os"
 
 	"github.com/zetaoss/zavatar/internal/app"
@@ -15,6 +15,7 @@ func main() {
 		Args:    os.Args[1:],
 		Version: Version,
 	}); err != nil {
-		log.Fatal(err)
+		slog.Error("application exited with error", "err", err)
+		os.Exit(1)
 	}
 }
