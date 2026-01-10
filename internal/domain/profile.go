@@ -37,8 +37,6 @@ func AvatarTypeFromCode(code AvatarTypeCode) AvatarType {
 		return AvatarTypeLetter
 	case AvatarTypeCodeGravatar:
 		return AvatarTypeGravatar
-	case AvatarTypeCodeIdenticon:
-		fallthrough
 	default:
 		return AvatarTypeIdenticon
 	}

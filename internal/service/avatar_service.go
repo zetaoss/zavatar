@@ -202,9 +202,8 @@ func (s *AvatarService) renderAt(ctx context.Context, prof *domain.UserProfile, 
 	case domain.AvatarTypeGravatar:
 		gh := strings.TrimSpace(prof.GHash)
 		if gh == "" {
-			name := safeName(prof.Name, userID)
-			b, e := render.LetterPNG(s.siteSalt, name, size)
-			return b, true, e
+			fb, fe := render.IdenticonPNG(s.siteSalt, userID, size)
+			return fb, false, fe
 		}
 
 		url := render.GravatarURL(gh, size)
@@ -214,13 +213,12 @@ func (s *AvatarService) renderAt(ctx context.Context, prof *domain.UserProfile, 
 		}
 
 		if storage.IsNotFound(e) {
-			log.Debug("gravatar not found, fallback to letter")
+			log.Debug("gravatar not found, fallback to identicon")
 		} else {
-			log.Warn("gravatar fetch error, fallback to letter", "err", e)
+			log.Warn("gravatar fetch error, fallback to identicon", "err", e)
 		}
 
-		name := safeName(prof.Name, userID)
-		fb, fe := render.LetterPNG(s.siteSalt, name, size)
+		fb, fe := render.IdenticonPNG(s.siteSalt, userID, size)
 		return fb, false, fe
 
 	case domain.AvatarTypeIdenticon:
