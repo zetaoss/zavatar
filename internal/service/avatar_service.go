@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"mime"
 	"net/http"
 	"strings"
@@ -42,7 +43,8 @@ type AvatarService struct {
 
 func NewAvatarService(st storage.Storage, d db.DB, siteSalt string, baseURL string, purger cloudflare.Purger) *AvatarService {
 	baseURL = strings.TrimRight(baseURL, "/")
-	bp := cloudflare.NewBatchPurger(purger)
+
+	bp := cloudflare.NewBatchPurger(purger, slog.Default())
 	return &AvatarService{
 		storage:     st,
 		db:          d,
@@ -99,7 +101,7 @@ func (s *AvatarService) Resolve(ctx context.Context, in ResolveInput) (*ResolveO
 	}
 
 	if isPreview {
-		sfKey := fmt.Sprintf("official|uid=%d|s=%d", in.UserID, sizeEff)
+		sfKey := fmt.Sprintf("preview|type=%s|uid=%d|s=%d", typ, in.UserID, sizeEff)
 		b, err := s.sfBytes(sfKey, func() ([]byte, error) {
 			png, _, e := s.renderAt(ctx, prof, typ, in.UserID, sizeEff)
 			return png, e

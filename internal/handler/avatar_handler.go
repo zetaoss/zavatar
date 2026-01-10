@@ -36,7 +36,16 @@ func (h *AvatarHandler) GetAvatar(w http.ResponseWriter, r *http.Request) {
 
 	q := r.URL.Query()
 	sizeEff := domain.NormalizeSizeQuery(q.Get("s"))
-	t, _ := strconv.Atoi(q.Get("t"))
+
+	tStr := q.Get("t")
+	t := 0
+	if tStr != "" {
+		t, err = strconv.Atoi(tStr)
+		if err != nil {
+			http.Error(w, "bad t", http.StatusBadRequest)
+			return
+		}
+	}
 
 	log := zlog.Ctx(r.Context()).With("uid", uid, "s", sizeEff, "t", t)
 

@@ -1,4 +1,4 @@
-// internal/zlog/zlog.go
+// internal/zlog/logger.go
 package zlog
 
 import (
@@ -24,9 +24,10 @@ func Ctx(ctx context.Context) *slog.Logger {
 }
 
 type MyHandler struct {
-	out   *log.Logger
-	level slog.Leveler
-	attrs []string
+	out    *log.Logger
+	level  slog.Leveler
+	attrs  []string
+	groups []string
 }
 
 func NewMyHandler(w io.Writer, level slog.Leveler) *MyHandler {
@@ -51,8 +52,13 @@ func (h *MyHandler) Handle(_ context.Context, r slog.Record) error {
 		sb.WriteString(strings.Join(h.attrs, " "))
 	}
 
+	prefix := ""
+	if len(h.groups) > 0 {
+		prefix = strings.Join(h.groups, ".") + "."
+	}
+
 	r.Attrs(func(a slog.Attr) bool {
-		sb.WriteString(fmt.Sprintf(" %s=%v", a.Key, a.Value.Any()))
+		sb.WriteString(fmt.Sprintf(" %s%s=%v", prefix, a.Key, a.Value.Any()))
 		return true
 	})
 
@@ -64,19 +70,37 @@ func (h *MyHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 	newAttrs := make([]string, len(h.attrs))
 	copy(newAttrs, h.attrs)
 
+	prefix := ""
+	if len(h.groups) > 0 {
+		prefix = strings.Join(h.groups, ".") + "."
+	}
+
 	for _, a := range attrs {
-		newAttrs = append(newAttrs, fmt.Sprintf("%s=%v", a.Key, a.Value.Any()))
+		newAttrs = append(newAttrs, fmt.Sprintf("%s%s=%v", prefix, a.Key, a.Value.Any()))
 	}
 
 	return &MyHandler{
-		out:   h.out,
-		level: h.level,
-		attrs: newAttrs,
+		out:    h.out,
+		level:  h.level,
+		attrs:  newAttrs,
+		groups: append([]string(nil), h.groups...),
 	}
 }
 
 func (h *MyHandler) WithGroup(name string) slog.Handler {
-	return h
+	if name == "" {
+		return h
+	}
+	ng := make([]string, len(h.groups), len(h.groups)+1)
+	copy(ng, h.groups)
+	ng = append(ng, name)
+
+	return &MyHandler{
+		out:    h.out,
+		level:  h.level,
+		attrs:  append([]string(nil), h.attrs...),
+		groups: ng,
+	}
 }
 
 func Init() {

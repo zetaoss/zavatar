@@ -1,4 +1,4 @@
-// internal/pkg/cloudflare/client.go
+// infra/cloudflare/client.go
 package cloudflare
 
 import (

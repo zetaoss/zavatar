@@ -12,6 +12,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/zetaoss/zavatar/internal/service"
+	"github.com/zetaoss/zavatar/internal/store/storage"
 	"github.com/zetaoss/zavatar/internal/zlog"
 )
 
@@ -51,6 +52,11 @@ func (h *PurgeHandler) PurgeUser(w http.ResponseWriter, r *http.Request) {
 
 	n, err := h.svc.Purge(r.Context(), uid)
 	if err != nil {
+		if storage.IsNotFound(err) {
+			http.NotFound(w, r)
+			return
+		}
+
 		if errors.Is(err, context.Canceled) {
 			log.Info("purge canceled")
 			return
