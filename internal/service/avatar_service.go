@@ -190,19 +190,6 @@ func (s *AvatarService) sfBytes(key string, fn func() ([]byte, error)) ([]byte, 
 	return b, nil
 }
 
-func mapProfileType(t int) string {
-	switch t {
-	case 2:
-		return "letter"
-	case 3:
-		return "gravatar"
-	case 1:
-		fallthrough
-	default:
-		return "identicon"
-	}
-}
-
 func (s *AvatarService) renderAt(ctx context.Context, prof *domain.UserProfile, typ domain.AvatarType, userID int64, size int) ([]byte, bool, error) {
 	log := zlog.Ctx(ctx)
 
