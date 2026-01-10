@@ -141,7 +141,7 @@ WHERE u.user_id = ? LIMIT 1
 		p.GHash = ghash.String
 	}
 
-	slog.Debug("get profile result", "user_id", userID, "profile", p)
+	slog.Debug("get profile result", "user_id", userID, "type", p.Type, "has_ghash", ghash.Valid)
 
 	return p, nil
 }
