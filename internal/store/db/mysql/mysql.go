@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -13,13 +14,9 @@ import (
 )
 
 type DB struct {
-	db *sql.DB
-
-	// raw (kept for debugging / visibility)
-	database     string
-	userDatabase string
-
-	// quoted & validated (computed once in New)
+	db                 *sql.DB
+	database           string
+	userDatabase       string
 	quotedDatabase     string
 	quotedUserDatabase string
 }
@@ -31,16 +28,12 @@ type Config struct {
 	Password     string
 	Database     string
 	UserDatabase string
-
-	// Optional DSN params. Ensure formatDSN() actually applies this.
-	// Example: "parseTime=true&charset=utf8mb4&collation=utf8mb4_unicode_ci"
-	Params string
+	Params       string
 }
 
 func New(cfg Config) (*DB, error) {
 	dsn := formatDSN(cfg.Username, cfg.Password, cfg.Host, cfg.Port, cfg.Database)
 	if cfg.Params != "" {
-		// formatDSN already includes query params, so append with '&'
 		dsn += "&" + cfg.Params
 	}
 
@@ -49,13 +42,11 @@ func New(cfg Config) (*DB, error) {
 		return nil, err
 	}
 
-	// "Yield to others" pool settings.
 	db.SetMaxOpenConns(1)
 	db.SetMaxIdleConns(1)
 	db.SetConnMaxIdleTime(1 * time.Minute)
 	db.SetConnMaxLifetime(10 * time.Minute)
 
-	// Avoid potentially unbounded Ping() hang.
 	ctxPing, cancelPing := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancelPing()
 
@@ -100,13 +91,14 @@ SELECT u.user_name, p.t, p.ghash FROM %s.user u
 LEFT JOIN %s.profiles p ON p.user_id = u.user_id LIMIT 0
 `, d.quotedUserDatabase, d.quotedDatabase)
 
+	slog.Info("validating schema", "query", q)
+
 	rows, err := d.db.QueryContext(ctx, q)
 	if err != nil {
 		return fmt.Errorf("mysql: invalid schema (user/profiles): %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 
-	// LIMIT 0: if QueryContext succeeded, schema/columns are compatible enough.
 	return nil
 }
 
@@ -119,6 +111,8 @@ LEFT JOIN %s.profiles p ON p.user_id = u.user_id
 WHERE u.user_id = ? LIMIT 1
 `, d.quotedUserDatabase, d.quotedDatabase)
 
+	slog.Debug("executing get profile query", "query", q, "user_id", userID)
+
 	var (
 		userName string
 		t        sql.NullInt64
@@ -128,6 +122,7 @@ WHERE u.user_id = ? LIMIT 1
 	err := d.db.QueryRowContext(ctx, q, userID).Scan(&userName, &t, &ghash)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
+			slog.Debug("get profile: no rows found", "user_id", userID)
 			return nil, nil
 		}
 		return nil, fmt.Errorf("mysql: get profile user_id=%d: %w", userID, err)
@@ -145,6 +140,9 @@ WHERE u.user_id = ? LIMIT 1
 	if ghash.Valid {
 		p.GHash = ghash.String
 	}
+
+	slog.Debug("get profile result", "user_id", userID, "profile", p)
+
 	return p, nil
 }
 
