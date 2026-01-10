@@ -38,8 +38,11 @@ type Config struct {
 }
 
 func New(cfg Config) (*DB, error) {
-	// NOTE: Ensure formatDSN applies cfg.Params if you intend to use it.
 	dsn := formatDSN(cfg.Username, cfg.Password, cfg.Host, cfg.Port, cfg.Database)
+	if cfg.Params != "" {
+		// formatDSN already includes query params, so append with '&'
+		dsn += "&" + cfg.Params
+	}
 
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {
