@@ -4,37 +4,13 @@ package mysql
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"regexp"
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/stretchr/testify/require"
+	"github.com/zetaoss/zavatar/internal/domain"
 )
-
-func TestMapProfileType(t *testing.T) {
-	t.Parallel()
-
-	cases := []struct {
-		in   int64
-		want string
-	}{
-		{1, "letter"},
-		{2, "identicon"},
-		{3, "gravatar"},
-		{0, "letter"},
-		{-1, "letter"},
-		{999, "letter"},
-	}
-
-	for _, tc := range cases {
-		tc := tc
-		t.Run(fmt.Sprintf("t=%d", tc.in), func(t *testing.T) {
-			t.Parallel()
-			require.Equal(t, tc.want, mapProfileType(tc.in))
-		})
-	}
-}
 
 func TestDB_Get_SQLMock_ProfileExists(t *testing.T) {
 	t.Parallel()
@@ -69,7 +45,7 @@ WHERE u.user_id = ? LIMIT 1
 	require.NotNil(t, p)
 
 	require.Equal(t, "Testuser", p.Name)
-	require.Equal(t, "identicon", p.Type)
+	require.Equal(t, domain.AvatarTypeLetter, p.Type)
 	require.Equal(t, "abcd1234", p.GHash)
 
 	require.NoError(t, mock.ExpectationsWereMet())
@@ -108,7 +84,7 @@ WHERE u.user_id = ? LIMIT 1
 	require.NotNil(t, p)
 
 	require.Equal(t, "NoProfileUser", p.Name)
-	require.Equal(t, "letter", p.Type)
+	require.Equal(t, domain.AvatarTypeIdenticon, p.Type)
 	require.Equal(t, "", p.GHash)
 
 	require.NoError(t, mock.ExpectationsWereMet())

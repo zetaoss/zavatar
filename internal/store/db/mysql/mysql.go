@@ -122,14 +122,14 @@ WHERE u.user_id = ? LIMIT 1
 		return nil, fmt.Errorf("mysql: get profile user_id=%d: %w", userID, err)
 	}
 
-	tt := int64(1)
+	tt := domain.AvatarTypeCodeIdenticon
 	if t.Valid {
-		tt = t.Int64
+		tt = domain.AvatarTypeCode(t.Int64)
 	}
 
 	p := &domain.UserProfile{
 		Name: string(userName),
-		Type: mapProfileType(tt),
+		Type: domain.AvatarTypeFromCode(tt),
 	}
 	if ghash.Valid {
 		p.GHash = ghash.String
@@ -151,17 +151,4 @@ func quoteIdent(s string) (string, error) {
 	}
 	escaped := strings.ReplaceAll(s, "`", "``")
 	return "`" + escaped + "`", nil
-}
-
-func mapProfileType(t int64) string {
-	switch t {
-	case 1:
-		return "letter"
-	case 2:
-		return "identicon"
-	case 3:
-		return "gravatar"
-	default:
-		return "letter"
-	}
 }
