@@ -11,7 +11,7 @@ import (
 	"github.com/zetaoss/zavatar/internal/zlog"
 )
 
-func router(avatarH *handler.AvatarHandler, purgeH *handler.PurgeHandler) http.Handler {
+func router(avatarH *handler.AvatarHandler, internalH *handler.InternalHandler) http.Handler {
 	r := chi.NewRouter()
 
 	r.Use(middleware.RequestID)
@@ -25,7 +25,7 @@ func router(avatarH *handler.AvatarHandler, purgeH *handler.PurgeHandler) http.H
 	r.Get("/u/{user_id}", avatarH.GetAvatar)
 
 	r.Route("/internal", func(r chi.Router) {
-		r.Post("/purge/u/{user_id}", purgeH.PurgeUser)
+		r.Post("/purge/u/{user_id}", internalH.PurgeAvatar)
 	})
 
 	return r

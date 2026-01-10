@@ -39,7 +39,7 @@ url:
 	@echo "preview gravatar (missing)->identicon  http://localhost:8080/u/1?s=80&t=3"
 
 
-PURGE_KEY = secret
+INTERNAL_KEY = secret
 
 .PHONY: purge
 purge:
@@ -50,7 +50,7 @@ purge:
 	@echo ""
 	@echo "purge official avatars for uid=1"
 	@echo ""
-	@curl -X POST -H "X-Purge-Key: $(PURGE_KEY)" http://localhost:8080/internal/purge/u/1
+	@curl -X POST -H "X-Internal-Key: $(INTERNAL_KEY)" http://localhost:8080/internal/purge/u/1
 	@echo ""
 
 .PHONY: lint

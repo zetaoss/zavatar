@@ -1,4 +1,4 @@
-// internal/handler/purge_handler.go
+// internal/handler/internal_handler.go
 package handler
 
 import (
@@ -16,27 +16,27 @@ import (
 	"github.com/zetaoss/zavatar/internal/zlog"
 )
 
-type PurgeHandler struct {
-	svc      *service.AvatarService
-	purgeKey string
+type InternalHandler struct {
+	svc         *service.AvatarService
+	internalKey string
 }
 
-func NewPurgeHandler(svc *service.AvatarService, purgeKey string) *PurgeHandler {
-	return &PurgeHandler{svc: svc, purgeKey: purgeKey}
+func NewInternalHandler(svc *service.AvatarService, internalKey string) *InternalHandler {
+	return &InternalHandler{svc, internalKey}
 }
 
 type purgeResp struct {
 	Deleted int `json:"deleted"`
 }
 
-func (h *PurgeHandler) PurgeUser(w http.ResponseWriter, r *http.Request) {
-	if h.purgeKey == "" {
+func (h *InternalHandler) PurgeAvatar(w http.ResponseWriter, r *http.Request) {
+	if h.internalKey == "" {
 		http.Error(w, "purge disabled", http.StatusNotFound)
 		return
 	}
 
-	got := r.Header.Get("X-Purge-Key")
-	if subtle.ConstantTimeCompare([]byte(got), []byte(h.purgeKey)) != 1 {
+	got := r.Header.Get("X-Internal-Key")
+	if subtle.ConstantTimeCompare([]byte(got), []byte(h.internalKey)) != 1 {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}

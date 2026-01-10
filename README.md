@@ -71,9 +71,9 @@ GET /u/{uid}?s={size}&t={type}
 
 ```env
 ADDR=:8080
-SITE_SALT=example.com
-PURGE_KEY=xxxx
 BASE_URL=avatars.example.com
+INTERNAL_KEY=xxxx
+SITE_SALT=example.com
 CF_ZONE_ID=xxxx
 CF_API_TOKEN=xxxx
 ```
