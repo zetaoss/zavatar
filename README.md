@@ -34,9 +34,9 @@ The avatar type is selected by the numeric value of `t`.
 
 Supported sizes:
 
-'''text
+```text
 16, 32, 64, 128, 320
-'''
+```
 
 - Other sizes are normalized
 - Avatars are generated at the target size
@@ -45,9 +45,9 @@ Supported sizes:
 
 ## API
 
-'''http
+```http
 GET /u/{uid}?s={size}&t={type}
-'''
+```
 
 | Parameter | Required | Description |
 |----------|----------|-------------|
@@ -69,18 +69,18 @@ GET /u/{uid}?s={size}&t={type}
 
 ### Server
 
-'''env
+```env
 ADDR=:8080
 SITE_SALT=example.com
 PURGE_KEY=xxxx
 BASE_URL=avatars.example.com
 CF_ZONE_ID=xxxx
 CF_API_TOKEN=xxxx
-'''
+```
 
 ### Storage
 
-'''env
+```env
 STORAGE_DRIVER=filesystem   # default
 
 STORAGE_DRIVER=r2
@@ -89,11 +89,11 @@ R2_BUCKET=zavatar
 R2_ACCESS_KEY=xxxx
 R2_SECRET_KEY=xxxx
 R2_PREFIX=v1/
-'''
+```
 
 ### Database
 
-'''env
+```env
 DB_DRIVER=fake              # default
 
 DB_DRIVER=mysql
@@ -103,13 +103,13 @@ MYSQL_USERNAME=root
 MYSQL_PASSWORD=secret
 MYSQL_DATABASE=pdb
 MYSQL_USER_DATABASE=udb
-'''
+```
 
 ---
 
 ## Examples
 
-'''text
+```text
 # service mode
 /u/1?s=32
 
@@ -117,4 +117,4 @@ MYSQL_USER_DATABASE=udb
 /u/1?s=64&t=1
 /u/1?s=64&t=2
 /u/3?s=128&t=3
-'''
+```
