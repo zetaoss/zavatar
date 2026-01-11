@@ -30,6 +30,10 @@ type BatchPurger struct {
 }
 
 func NewBatchPurger(client Purger) *BatchPurger {
+	if client == nil {
+		return nil
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	bp := &BatchPurger{
 		client: client,
@@ -50,6 +54,7 @@ func (b *BatchPurger) Add(prefix string) {
 	select {
 	case b.queue <- prefix:
 	case <-b.ctx.Done():
+		slog.Warn("batch purger closing, dropping prefix", "prefix", prefix)
 	default:
 		slog.Warn("batch purger queue full, dropping prefix", "prefix", prefix, "queue_size", queueSize)
 	}
@@ -66,6 +71,8 @@ func (b *BatchPurger) run() {
 	defer b.wg.Done()
 
 	batch := make([]string, 0, maxPrefixesPerRequest)
+	seen := make(map[string]struct{})
+
 	ticker := time.NewTicker(flushInterval)
 	defer ticker.Stop()
 
@@ -73,18 +80,27 @@ func (b *BatchPurger) run() {
 		if len(batch) == 0 {
 			return
 		}
-		items := make([]string, len(batch))
-		copy(items, batch)
-		batch = batch[:0]
+		// 슬라이스 복사
+		items := append([]string(nil), batch...)
 
-		b.wg.Add(1)
+		// 상태 초기화
+		batch = batch[:0]
+		clear(seen)
+
+		b.wg.Add(1) // Worker 대기 카운트 추가
 		go b.processBatch(items)
 	}
 
 	for {
 		select {
 		case prefix := <-b.queue:
+			if _, exists := seen[prefix]; exists {
+				continue
+			}
+
+			seen[prefix] = struct{}{}
 			batch = append(batch, prefix)
+
 			if len(batch) >= maxPrefixesPerRequest {
 				flush()
 				ticker.Reset(flushInterval)
@@ -105,7 +121,8 @@ func (b *BatchPurger) processBatch(items []string) {
 
 	select {
 	case b.sem <- struct{}{}:
-	case <-b.ctx.Done():
+	case <-time.After(5 * time.Second):
+		slog.Error("timeout acquiring semaphore during shutdown", "items", len(items))
 		return
 	}
 	defer func() { <-b.sem }()
@@ -114,11 +131,7 @@ func (b *BatchPurger) processBatch(items []string) {
 	delay := baseRetryDelay
 
 	for i := range maxAttempts {
-		if b.ctx.Err() != nil {
-			return
-		}
-
-		reqCtx, cancel := context.WithTimeout(b.ctx, reqTimeout)
+		reqCtx, cancel := context.WithTimeout(context.Background(), reqTimeout)
 		err := b.client.PurgePrefixes(reqCtx, items)
 		cancel()
 
@@ -127,7 +140,12 @@ func (b *BatchPurger) processBatch(items []string) {
 			return
 		}
 
-		slog.Warn("purge batch failed, retrying", "attempt", i+1, "max_attempts", maxAttempts, "retry_in", delay, "error", err)
+		if b.ctx.Err() != nil {
+			slog.Warn("purge batch failed and context canceled, giving up", "error", err)
+			return
+		}
+
+		slog.Warn("purge batch failed, retrying", "attempt", i+1, "retry_in", delay, "error", err)
 
 		timer := time.NewTimer(delay)
 		select {
@@ -139,5 +157,5 @@ func (b *BatchPurger) processBatch(items []string) {
 		}
 	}
 
-	slog.Error("purge batch failed permanently", "count", len(items), "duration", time.Since(startTime), "attempts", maxAttempts, "sample_item", items[0])
+	slog.Error("purge batch failed permanently", "count", len(items), "duration", time.Since(startTime), "attempts", maxAttempts)
 }
