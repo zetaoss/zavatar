@@ -1,4 +1,4 @@
-// internal/DB/db/fake/fake.go
+// internal/api/fake/fake.go
 package fake
 
 import (
@@ -6,15 +6,18 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"log/slog"
 
 	"github.com/zetaoss/zavatar/internal/domain"
 )
 
-type DB struct{}
+type API struct{}
 
-func New() *DB { return &DB{} }
+func New() *API { return &API{} }
 
-func (d *DB) Get(ctx context.Context, userID int64) (*domain.UserProfile, error) {
+func (a *API) Get(ctx context.Context, userID int64) (*domain.UserProfile, error) {
+	slog.Info("fake api get", "user_id", userID)
+
 	switch userID % 3 {
 	case 0:
 		return &domain.UserProfile{
@@ -33,10 +36,6 @@ func (d *DB) Get(ctx context.Context, userID int64) (*domain.UserProfile, error)
 			Type: "identicon",
 		}, nil
 	}
-}
-
-func (d *DB) Close() error {
-	return nil
 }
 
 func fake32(s string) string {

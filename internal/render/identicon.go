@@ -1,4 +1,4 @@
-// internal/render/identicon_png.go
+// internal/render/identicon.go
 package render
 
 import (

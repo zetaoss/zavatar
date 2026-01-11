@@ -1,4 +1,4 @@
-// internal/render/letter_png_test.go
+// internal/render/initials_test.go
 package render
 
 import (
@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func Test_pickLetters(t *testing.T) {
+func Test_pickInitials(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -71,15 +71,15 @@ func Test_pickLetters(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			require.Equal(t, tc.want, pickLetters(tc.input))
+			require.Equal(t, tc.want, pickInitials(tc.input))
 		})
 	}
 }
 
-func Test_LetterPNG_Basic(t *testing.T) {
+func Test_InitialsPNG_Basic(t *testing.T) {
 	t.Parallel()
 
-	b, err := LetterPNG("site", "alice bob", 64)
+	b, err := InitialsPNG("site", "alice bob", 64)
 	require.NoError(t, err)
 	require.Greater(t, len(b), 16)
 

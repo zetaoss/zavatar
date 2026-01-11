@@ -12,7 +12,6 @@ import (
 
 	"github.com/zetaoss/zavatar/internal/config"
 	"github.com/zetaoss/zavatar/internal/handler"
-	"github.com/zetaoss/zavatar/internal/infra/cloudflare"
 	"github.com/zetaoss/zavatar/internal/service"
 	"github.com/zetaoss/zavatar/internal/zlog"
 )
@@ -35,24 +34,18 @@ func Run(c Config) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	st, err := wireStorage(ctx, cfg.Storage)
+	st, err := wireStorage(cfg.Storage)
 	if err != nil {
 		return err
 	}
-	db, err := wireDB(cfg.DB)
+	apiClient, err := wireAPI(cfg.API)
 	if err != nil {
 		return err
 	}
 
-	cfPurger := cloudflare.NewClient(cfg.Cloudflare.ZoneID, cfg.Cloudflare.APIToken)
-
-	avatarSvc := service.NewAvatarService(st, db, cfg.SiteSalt, cfg.BaseURL, cfPurger)
-	defer avatarSvc.Close()
-
+	avatarSvc := service.NewAvatarService(st.St, apiClient, cfg.SiteSalt, st.Prefix)
 	avatarH := handler.NewAvatarHandler(avatarSvc)
-	internalH := handler.NewInternalHandler(avatarSvc, cfg.InternalKey)
-
-	h := router(avatarH, internalH)
+	h := router(avatarH, st.EnableLocalStatic)
 
 	srv := &http.Server{
 		Addr:    cfg.Addr,
