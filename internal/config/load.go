@@ -26,7 +26,6 @@ func Load(args []string) (Config, error) {
 	r2PublicBase := fs.String("r2-public-base", "", "env: R2_PUBLIC_BASE (e.g. https://avatars-cdn.example.com)")
 
 	apiEndpoint := fs.String("api-endpoint", "", "env: API_ENDPOINT")
-	apiAccessKey := fs.String("api-access-key", "", "env: API_ACCESS_KEY")
 	apiSecretKey := fs.String("api-secret-key", "", "env: API_SECRET_KEY")
 
 	if err := ff.Parse(fs, args, ff.WithEnvVars()); err != nil {
@@ -50,7 +49,6 @@ func Load(args []string) (Config, error) {
 		API: APIConfig{
 			Mode:      strings.TrimSpace(*apiMode),
 			Endpoint:  strings.TrimSpace(*apiEndpoint),
-			AccessKey: strings.TrimSpace(*apiAccessKey),
 			SecretKey: strings.TrimSpace(*apiSecretKey),
 		},
 	}
@@ -111,9 +109,6 @@ func validate(cfg Config) error {
 	case "remote":
 		if strings.TrimSpace(cfg.API.Endpoint) == "" {
 			return fmt.Errorf("api: missing API_ENDPOINT")
-		}
-		if strings.TrimSpace(cfg.API.AccessKey) == "" {
-			return fmt.Errorf("api: missing API_ACCESS_KEY")
 		}
 		if strings.TrimSpace(cfg.API.SecretKey) == "" {
 			return fmt.Errorf("api: missing API_SECRET_KEY")

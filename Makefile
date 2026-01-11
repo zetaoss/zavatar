@@ -31,7 +31,7 @@ curl:
 	@curl -s -o /dev/null -D - "http://localhost:8080/u/2?s=200&t=2" | grep -i -E '^HTTP/|^Location:'
 	@echo ""
 	@echo "identicon large (uid=3, s=320)"
-	@echo "  url: http://localhost:8080/u/3s=320&t=1"
+	@echo "  url: http://localhost:8080/u/3?s=320&t=1"
 	@curl -s -o /dev/null -D - "http://localhost:8080/u/3?s=320&t=1" | grep -i -E '^HTTP/|^Location:'
 	@echo ""
 	@echo "missing user (uid=9999999999, s=40)"

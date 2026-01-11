@@ -166,14 +166,6 @@ func TestLoad_API_RemoteRequiresKeys(t *testing.T) {
 		"-api-endpoint", "https://api.example.com",
 	})
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "api: missing API_ACCESS_KEY")
-
-	_, err = Load([]string{
-		"-api-mode", "remote",
-		"-api-endpoint", "https://api.example.com",
-		"-api-access-key", "ak",
-	})
-	require.Error(t, err)
 	require.Contains(t, err.Error(), "api: missing API_SECRET_KEY")
 }
 

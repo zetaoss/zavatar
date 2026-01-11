@@ -115,7 +115,6 @@ API_MODE=fake              # default
 
 API_MODE=remote
 API_ENDPOINT=https://api.example.com
-API_ACCESS_KEY=xxxx
 API_SECRET_KEY=xxxx
 ```
 

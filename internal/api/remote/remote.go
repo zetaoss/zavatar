@@ -19,15 +19,13 @@ import (
 
 type API struct {
 	endpoint  string
-	accessKey string
 	secretKey string
 	client    *http.Client
 }
 
-func New(endpoint, accessKey, secretKey string) *API {
+func New(endpoint, secretKey string) *API {
 	return &API{
 		endpoint:  strings.TrimRight(endpoint, "/"),
-		accessKey: accessKey,
 		secretKey: secretKey,
 		client:    &http.Client{Timeout: 5 * time.Second},
 	}
@@ -48,7 +46,6 @@ func (a *API) Get(ctx context.Context, userID int64) (*domain.UserProfile, error
 	ts := fmt.Sprintf("%d", time.Now().UTC().Unix())
 	sig := a.sign(req.Method, req.URL.Path, req.URL.RawQuery, ts)
 
-	req.Header.Set("X-Api-Access-Key", a.accessKey)
 	req.Header.Set("X-Api-Timestamp", ts)
 	req.Header.Set("X-Api-Signature", sig)
 

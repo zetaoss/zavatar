@@ -25,6 +25,5 @@ type R2Config struct {
 type APIConfig struct {
 	Mode      string
 	Endpoint  string
-	AccessKey string
 	SecretKey string
 }
