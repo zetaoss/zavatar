@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log/slog"
 	"mime"
 	"net/http"
 	"strings"
@@ -44,7 +43,7 @@ type AvatarService struct {
 func NewAvatarService(st storage.Storage, d db.DB, siteSalt string, baseURL string, purger cloudflare.Purger) *AvatarService {
 	baseURL = strings.TrimRight(baseURL, "/")
 
-	bp := cloudflare.NewBatchPurger(purger, slog.Default())
+	bp := cloudflare.NewBatchPurger(purger)
 	return &AvatarService{
 		storage:     st,
 		db:          d,
