@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 
@@ -49,9 +50,12 @@ func (c *Client) PurgePrefixes(ctx context.Context, prefixes []string) error {
 		return nil
 	}
 
-	payload, _ := json.Marshal(purgeReq{Prefixes: prefixes})
-	apiURL := fmt.Sprintf("https://api.cloudflare.com/client/v4/zones/%s/purge_cache", c.zoneID)
+	payload, err := json.Marshal(purgeReq{Prefixes: prefixes})
+	if err != nil {
+		return fmt.Errorf("marshal error: %w", err)
+	}
 
+	apiURL := fmt.Sprintf("https://api.cloudflare.com/client/v4/zones/%s/purge_cache", c.zoneID)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, bytes.NewReader(payload))
 	if err != nil {
 		return err
@@ -60,7 +64,7 @@ func (c *Client) PurgePrefixes(ctx context.Context, prefixes []string) error {
 	req.Header.Set("Authorization", "Bearer "+c.apiToken)
 	req.Header.Set("Content-Type", "application/json")
 
-	zlog.Ctx(ctx).Debug("requesting cloudflare purge by prefix", "count", len(prefixes))
+	zlog.Ctx(ctx).Debug("requesting cloudflare purge", "count", len(prefixes))
 
 	resp, err := c.client.Do(req)
 	if err != nil {
@@ -71,7 +75,13 @@ func (c *Client) PurgePrefixes(ctx context.Context, prefixes []string) error {
 	}()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("api status: %d", resp.StatusCode)
+		bodyBytes, _ := io.ReadAll(io.LimitReader(resp.Body, 256))
+		zlog.Ctx(ctx).Error("cloudflare api returned non-200 status",
+			"status", resp.StatusCode,
+			"body", string(bodyBytes),
+			"zone_id", c.zoneID,
+		)
+		return fmt.Errorf("cloudflare api status=%d body=%q", resp.StatusCode, string(bodyBytes))
 	}
 
 	var r purgeResp
@@ -84,6 +94,10 @@ func (c *Client) PurgePrefixes(ctx context.Context, prefixes []string) error {
 		if len(r.Errors) > 0 {
 			msg = r.Errors[0].Message
 		}
+		zlog.Ctx(ctx).Error("cloudflare purge returned failure",
+			"error_msg", msg,
+			"zone_id", c.zoneID,
+		)
 		return fmt.Errorf("cloudflare failed: %s", msg)
 	}
 
