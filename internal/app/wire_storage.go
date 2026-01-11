@@ -2,26 +2,48 @@
 package app
 
 import (
-	"context"
+	"fmt"
 
 	"github.com/zetaoss/zavatar/internal/config"
-	storagestore "github.com/zetaoss/zavatar/internal/store/storage"
-	filesystemstorage "github.com/zetaoss/zavatar/internal/store/storage/filesystem"
-	r2storage "github.com/zetaoss/zavatar/internal/store/storage/r2"
+	"github.com/zetaoss/zavatar/internal/storage"
+	"github.com/zetaoss/zavatar/internal/storage/local"
+	"github.com/zetaoss/zavatar/internal/storage/r2"
 )
 
-func wireStorage(ctx context.Context, sc config.StorageConfig) (storagestore.Storage, error) {
-	switch sc.Driver {
-	case "r2":
-		return r2storage.New(ctx, r2storage.Config{
-			AccountID: sc.R2.AccountID,
-			Bucket:    sc.R2.Bucket,
-			AccessKey: sc.R2.AccessKey,
-			SecretKey: sc.R2.SecretKey,
-			Prefix:    sc.R2.Prefix,
-		})
+type WiredStorage struct {
+	St                storage.Storage
+	EnableLocalStatic bool
+	Prefix            string
+}
 
-	default: // filesystem
-		return filesystemstorage.New(), nil
+func wireStorage(cfg config.StorageConfig) (WiredStorage, error) {
+	switch cfg.Driver {
+	case "local":
+		st := local.New()
+		return WiredStorage{
+			St:                st,
+			EnableLocalStatic: true,
+			Prefix:            "v1",
+		}, nil
+
+	case "r2":
+		st, err := r2.New(
+			cfg.R2.AccountID,
+			cfg.R2.Bucket,
+			cfg.R2.AccessKey,
+			cfg.R2.SecretKey,
+			cfg.R2.PublicBase,
+		)
+		if err != nil {
+			return WiredStorage{}, err
+		}
+		return WiredStorage{
+			St:                st,
+			EnableLocalStatic: false,
+			Prefix:            cfg.R2.Directory,
+		}, nil
+
+	default:
+		return WiredStorage{}, fmt.Errorf("invalid storage driver: %q", cfg.Driver)
 	}
 }

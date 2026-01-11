@@ -1,4 +1,4 @@
-// internal/render/letter_png.go
+// internal/render/initials.go
 package render
 
 import (
@@ -19,12 +19,12 @@ import (
 	"golang.org/x/image/math/fixed"
 )
 
-func LetterPNG(siteSalt, name string, size int) ([]byte, error) {
+func InitialsPNG(siteSalt, name string, size int) ([]byte, error) {
 	if size < 1 {
 		size = 1
 	}
 
-	label := pickLetters(name)
+	label := pickInitials(name)
 	if label == "" {
 		label = "?"
 	}
@@ -35,7 +35,7 @@ func LetterPNG(siteSalt, name string, size int) ([]byte, error) {
 	img := image.NewRGBA(image.Rect(0, 0, size, size))
 	draw.Draw(img, img.Bounds(), &image.Uniform{C: bg}, image.Point{}, draw.Src)
 
-	face, err := makeLetterFace(size, runeCount(label))
+	face, err := makeInitialsFace(size, runeCount(label))
 	if err != nil {
 		return nil, err
 	}
@@ -50,7 +50,7 @@ func LetterPNG(siteSalt, name string, size int) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func makeLetterFace(imgSize int, n int) (font.Face, error) {
+func makeInitialsFace(imgSize int, n int) (font.Face, error) {
 	ratio := 0.66
 	if n > 1 {
 		ratio = 0.54
@@ -130,7 +130,7 @@ func measureRune(face font.Face, r rune) int {
 
 func runeCount(s string) int { return len([]rune(s)) }
 
-func pickLetters(name string) string {
+func pickInitials(name string) string {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return "?"

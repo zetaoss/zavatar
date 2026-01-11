@@ -14,15 +14,15 @@ func TestLoad_Defaults(t *testing.T) {
 	require.Equal(t, ":8080", cfg.Addr)
 	require.Equal(t, "example.com", cfg.SiteSalt)
 
-	require.Equal(t, "filesystem", cfg.Storage.Driver)
-	require.Equal(t, "memory", cfg.DB.Driver)
+	require.Equal(t, "local", cfg.Storage.Driver)
+	require.Equal(t, "fake", cfg.API.Mode)
 }
 
 func TestLoad_TrimsAndNormalizes(t *testing.T) {
 	cfg, err := Load([]string{
 		"-addr", "  :9999  ",
 		"-site-salt", "  hello  ",
-		"-storage-driver", "  filesystem  ",
+		"-storage-driver", "  local  ",
 	})
 	require.NoError(t, err)
 
@@ -30,33 +30,34 @@ func TestLoad_TrimsAndNormalizes(t *testing.T) {
 	require.Equal(t, "hello", cfg.SiteSalt)
 }
 
-func TestLoad_R2_NormalizePrefix(t *testing.T) {
+func TestLoad_R2_Directory(t *testing.T) {
 	cfg, err := Load([]string{
 		"-storage-driver", "r2",
-		"-r2-account-id", "acc",
 		"-r2-bucket", "bucket",
+		"-r2-account-id", "acc",
 		"-r2-access-key", "ak",
 		"-r2-secret-key", "sk",
-		"-r2-prefix", "dev",
+		"-r2-directory", "/dev/",
+		"-r2-public-base", "https://cdn.example.com",
 	})
 	require.NoError(t, err)
 
 	require.Equal(t, "r2", cfg.Storage.Driver)
-	require.Equal(t, "dev/", cfg.Storage.R2.Prefix)
+	require.Equal(t, "dev", cfg.Storage.R2.Directory)
 }
 
-func TestLoad_R2_PrefixEmptyStaysEmpty(t *testing.T) {
-	cfg, err := Load([]string{
+func TestLoad_R2_DirectoryEmptyStaysEmpty(t *testing.T) {
+	_, err := Load([]string{
 		"-storage-driver", "r2",
-		"-r2-account-id", "acc",
 		"-r2-bucket", "bucket",
+		"-r2-account-id", "acc",
 		"-r2-access-key", "ak",
 		"-r2-secret-key", "sk",
-		"-r2-prefix", "   ",
+		"-r2-directory", "   ",
+		"-r2-public-base", "https://cdn.example.com",
 	})
-	require.NoError(t, err)
-
-	require.Equal(t, "", cfg.Storage.R2.Prefix)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "r2: missing R2_DIRECTORY")
 }
 
 func TestLoad_R2_ValidateMissingFields(t *testing.T) {
@@ -66,6 +67,8 @@ func TestLoad_R2_ValidateMissingFields(t *testing.T) {
 			"-r2-bucket", "bucket",
 			"-r2-access-key", "ak",
 			"-r2-secret-key", "sk",
+			"-r2-directory", "dev",
+			"-r2-public-base", "https://cdn.example.com",
 		})
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "r2: missing R2_ACCOUNT_ID")
@@ -77,6 +80,8 @@ func TestLoad_R2_ValidateMissingFields(t *testing.T) {
 			"-r2-account-id", "acc",
 			"-r2-access-key", "ak",
 			"-r2-secret-key", "sk",
+			"-r2-directory", "dev",
+			"-r2-public-base", "https://cdn.example.com",
 		})
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "r2: missing R2_BUCKET")
@@ -85,9 +90,11 @@ func TestLoad_R2_ValidateMissingFields(t *testing.T) {
 	t.Run("missing access key", func(t *testing.T) {
 		_, err := Load([]string{
 			"-storage-driver", "r2",
-			"-r2-account-id", "acc",
 			"-r2-bucket", "bucket",
+			"-r2-account-id", "acc",
 			"-r2-secret-key", "sk",
+			"-r2-directory", "dev",
+			"-r2-public-base", "https://cdn.example.com",
 		})
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "r2: missing R2_ACCESS_KEY")
@@ -96,12 +103,40 @@ func TestLoad_R2_ValidateMissingFields(t *testing.T) {
 	t.Run("missing secret key", func(t *testing.T) {
 		_, err := Load([]string{
 			"-storage-driver", "r2",
-			"-r2-account-id", "acc",
 			"-r2-bucket", "bucket",
+			"-r2-account-id", "acc",
 			"-r2-access-key", "ak",
+			"-r2-directory", "dev",
+			"-r2-public-base", "https://cdn.example.com",
 		})
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "r2: missing R2_SECRET_KEY")
+	})
+
+	t.Run("missing public base", func(t *testing.T) {
+		_, err := Load([]string{
+			"-storage-driver", "r2",
+			"-r2-bucket", "bucket",
+			"-r2-account-id", "acc",
+			"-r2-access-key", "ak",
+			"-r2-secret-key", "sk",
+			"-r2-directory", "dev",
+		})
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "r2: missing R2_PUBLIC_BASE")
+	})
+
+	t.Run("missing directory", func(t *testing.T) {
+		_, err := Load([]string{
+			"-storage-driver", "r2",
+			"-r2-bucket", "bucket",
+			"-r2-account-id", "acc",
+			"-r2-access-key", "ak",
+			"-r2-secret-key", "sk",
+			"-r2-public-base", "https://cdn.example.com",
+		})
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "r2: missing R2_DIRECTORY")
 	})
 }
 
@@ -112,43 +147,32 @@ func TestLoad_InvalidDrivers(t *testing.T) {
 		require.Contains(t, err.Error(), `invalid storage driver: "nope"`)
 	})
 
-	t.Run("invalid db driver", func(t *testing.T) {
-		_, err := Load([]string{"-db-driver", "nope"})
+	t.Run("invalid api mode", func(t *testing.T) {
+		_, err := Load([]string{"-api-mode", "nope"})
 		require.Error(t, err)
-		require.Contains(t, err.Error(), `invalid db driver: "nope"`)
+		require.Contains(t, err.Error(), `invalid api mode: "nope"`)
 	})
 }
 
-func TestLoad_MySQL_Validate(t *testing.T) {
-	t.Run("success", func(t *testing.T) {
-		cfg, err := Load([]string{
-			"-db-driver", "mysql",
-			"-mysql-host", "127.0.0.1",
-			"-mysql-port", "3307",
-			"-mysql-username", "u",
-			"-mysql-password", "p",
-			"-mysql-database", "pdb",
-			"-mysql-user-database", "udb",
-		})
-		require.NoError(t, err)
-		require.Equal(t, "mysql", cfg.DB.Driver)
-		require.Equal(t, "127.0.0.1", cfg.DB.MySQL.Host)
-		require.Equal(t, 3307, cfg.DB.MySQL.Port)
+func TestLoad_API_RemoteRequiresKeys(t *testing.T) {
+	_, err := Load([]string{
+		"-api-mode", "remote",
 	})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "api: missing API_ENDPOINT")
 
-	t.Run("missing required fields", func(t *testing.T) {
-		_, err := Load([]string{
-			"-db-driver", "mysql",
-			"-mysql-host", "127.0.0.1",
-		})
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "mysql: missing MYSQL_USERNAME")
+	_, err = Load([]string{
+		"-api-mode", "remote",
+		"-api-endpoint", "https://api.example.com",
 	})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "api: missing API_SECRET_KEY")
 }
 
 func TestLoad_UsesEnvVars(t *testing.T) {
 	t.Setenv("ADDR", "  :1234  ")
 	t.Setenv("SITE_SALT", "  envsalt  ")
+	t.Setenv("API_MODE", "fake")
 
 	cfg, err := Load(nil)
 	require.NoError(t, err)

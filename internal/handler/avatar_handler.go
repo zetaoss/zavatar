@@ -3,18 +3,15 @@ package handler
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"net/http"
 	"strconv"
-	"strings"
 
 	"github.com/go-chi/chi/v5"
 
 	"github.com/zetaoss/zavatar/internal/domain"
 	"github.com/zetaoss/zavatar/internal/service"
-	"github.com/zetaoss/zavatar/internal/store/storage"
+	"github.com/zetaoss/zavatar/internal/storage"
 	"github.com/zetaoss/zavatar/internal/zlog"
 )
 
@@ -38,13 +35,14 @@ func (h *AvatarHandler) GetAvatar(w http.ResponseWriter, r *http.Request) {
 	sizeEff := domain.NormalizeSizeQuery(q.Get("s"))
 
 	tStr := q.Get("t")
-	t := 0
-	if tStr != "" {
-		t, err = strconv.Atoi(tStr)
-		if err != nil {
-			http.Error(w, "bad t", http.StatusBadRequest)
-			return
-		}
+	if tStr == "" {
+		http.Error(w, "missing t", http.StatusBadRequest)
+		return
+	}
+	t, err := strconv.Atoi(tStr)
+	if err != nil || t < 1 || t > 2 {
+		http.Error(w, "bad params", http.StatusBadRequest)
+		return
 	}
 
 	log := zlog.Ctx(r.Context()).With("uid", uid, "s", sizeEff, "t", t)
@@ -57,6 +55,11 @@ func (h *AvatarHandler) GetAvatar(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if storage.IsNotFound(err) {
 			http.NotFound(w, r)
+			return
+		}
+
+		if errors.Is(err, service.ErrBadParams) {
+			http.Error(w, "bad params", http.StatusBadRequest)
 			return
 		}
 
@@ -76,39 +79,14 @@ func (h *AvatarHandler) GetAvatar(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sum := sha256.Sum256(out.PNG)
-	etag := `"` + hex.EncodeToString(sum[:]) + `"`
-
-	w.Header().Set("Content-Type", "image/png")
 	if out.CacheControl != "" {
 		w.Header().Set("Cache-Control", out.CacheControl)
 	}
-	w.Header().Set("ETag", etag)
 
-	if matchIfNoneMatch(r.Header.Get("If-None-Match"), etag) {
-		w.WriteHeader(http.StatusNotModified)
+	if out.RedirectURL == "" {
+		http.Error(w, "missing redirect", http.StatusInternalServerError)
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write(out.PNG)
-}
-
-func matchIfNoneMatch(ifNoneMatch string, etag string) bool {
-	ifNoneMatch = strings.TrimSpace(ifNoneMatch)
-	if ifNoneMatch == "" {
-		return false
-	}
-	if ifNoneMatch == "*" {
-		return true
-	}
-
-	parts := strings.Split(ifNoneMatch, ",")
-	for _, p := range parts {
-		tok := strings.TrimSpace(p)
-		if tok == etag || (strings.HasPrefix(tok, "W/") && strings.TrimSpace(tok[2:]) == etag) {
-			return true
-		}
-	}
-	return false
+	http.Redirect(w, r, out.RedirectURL, http.StatusFound)
 }

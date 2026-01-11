@@ -12,66 +12,44 @@ import (
 func Load(args []string) (Config, error) {
 	fs := flag.NewFlagSet("zavatar", flag.ContinueOnError)
 
-	// Server
 	addr := fs.String("addr", ":8080", "listen address, e.g. :8080 (env: ADDR)")
-	baseURL := fs.String("base-url", "", "public base url, e.g. https://avatars.example.com (env: BASE_URL)")
-	cfAPIToken := fs.String("cf-api-token", "", "cloudflare api token (env: CF_API_TOKEN)")
-	cfZoneID := fs.String("cf-zone-id", "", "cloudflare zone id (env: CF_ZONE_ID)")
-	internalKey := fs.String("internal-key", "", "internal key (env: INTERNAL_KEY)")
 	siteSalt := fs.String("site-salt", "example.com", "avatar site salt (env: SITE_SALT)")
 
-	// Drivers
-	storageDriver := fs.String("storage-driver", "filesystem", "storage driver: filesystem|r2 (env: STORAGE_DRIVER)")
-	dbDriver := fs.String("db-driver", "memory", "db driver: memory|mysql (env: DB_DRIVER)")
+	storageDriver := fs.String("storage-driver", "local", "storage driver: local|r2 (env: STORAGE_DRIVER)")
+	apiMode := fs.String("api-mode", "fake", "api mode: fake|remote (env: API_MODE)")
 
-	// R2
-	r2AccountID := fs.String("r2-account-id", "", "env: R2_ACCOUNT_ID")
 	r2Bucket := fs.String("r2-bucket", "", "env: R2_BUCKET")
+	r2AccountID := fs.String("r2-account-id", "", "env: R2_ACCOUNT_ID")
 	r2AccessKey := fs.String("r2-access-key", "", "env: R2_ACCESS_KEY")
 	r2SecretKey := fs.String("r2-secret-key", "", "env: R2_SECRET_KEY")
-	r2Prefix := fs.String("r2-prefix", "", "env: R2_PREFIX")
+	r2Directory := fs.String("r2-directory", "", "env: R2_DIRECTORY")
+	r2PublicBase := fs.String("r2-public-base", "", "env: R2_PUBLIC_BASE (e.g. https://avatars-cdn.example.com)")
 
-	// MySQL
-	mysqlHost := fs.String("mysql-host", "", "env: MYSQL_HOST")
-	mysqlPort := fs.Int("mysql-port", 3306, "env: MYSQL_PORT")
-	mysqlUsername := fs.String("mysql-username", "", "env: MYSQL_USERNAME")
-	mysqlPassword := fs.String("mysql-password", "", "env: MYSQL_PASSWORD")
-	mysqlDatabase := fs.String("mysql-database", "", "env: MYSQL_DATABASE")
-	mysqlUserDatabase := fs.String("mysql-user-database", "", "env: MYSQL_USER_DATABASE")
+	apiEndpoint := fs.String("api-endpoint", "", "env: API_ENDPOINT")
+	apiSecretKey := fs.String("api-secret-key", "", "env: API_SECRET_KEY")
 
 	if err := ff.Parse(fs, args, ff.WithEnvVars()); err != nil {
 		return Config{}, err
 	}
 
 	cfg := Config{
-		Addr:        strings.TrimSpace(*addr),
-		BaseURL:     strings.TrimSpace(*baseURL),
-		InternalKey: strings.TrimSpace(*internalKey),
-		SiteSalt:    strings.TrimSpace(*siteSalt),
-		Cloudflare: CloudflareConfig{
-			ZoneID:   strings.TrimSpace(*cfZoneID),
-			APIToken: strings.TrimSpace(*cfAPIToken),
-		},
+		Addr:     strings.TrimSpace(*addr),
+		SiteSalt: strings.TrimSpace(*siteSalt),
 		Storage: StorageConfig{
 			Driver: strings.TrimSpace(*storageDriver),
 			R2: R2Config{
-				AccountID: strings.TrimSpace(*r2AccountID),
-				Bucket:    strings.TrimSpace(*r2Bucket),
-				AccessKey: strings.TrimSpace(*r2AccessKey),
-				SecretKey: strings.TrimSpace(*r2SecretKey),
-				Prefix:    strings.TrimSpace(*r2Prefix),
+				AccountID:  strings.TrimSpace(*r2AccountID),
+				Bucket:     strings.TrimSpace(*r2Bucket),
+				AccessKey:  strings.TrimSpace(*r2AccessKey),
+				SecretKey:  strings.TrimSpace(*r2SecretKey),
+				Directory:  strings.TrimSpace(*r2Directory),
+				PublicBase: strings.TrimSpace(*r2PublicBase),
 			},
 		},
-		DB: DBConfig{
-			Driver: strings.TrimSpace(*dbDriver),
-			MySQL: MySQLConfig{
-				Host:         strings.TrimSpace(*mysqlHost),
-				Port:         *mysqlPort,
-				Username:     strings.TrimSpace(*mysqlUsername),
-				Password:     strings.TrimSpace(*mysqlPassword),
-				Database:     strings.TrimSpace(*mysqlDatabase),
-				UserDatabase: strings.TrimSpace(*mysqlUserDatabase),
-			},
+		API: APIConfig{
+			Mode:      strings.TrimSpace(*apiMode),
+			Endpoint:  strings.TrimSpace(*apiEndpoint),
+			SecretKey: strings.TrimSpace(*apiSecretKey),
 		},
 	}
 
@@ -85,23 +63,21 @@ func Load(args []string) (Config, error) {
 func normalize(cfg *Config) {
 	cfg.Addr = strings.TrimSpace(cfg.Addr)
 
-	cfg.BaseURL = strings.TrimSpace(cfg.BaseURL)
-
-	cfg.InternalKey = strings.TrimSpace(cfg.InternalKey)
-
 	cfg.SiteSalt = strings.TrimSpace(cfg.SiteSalt)
 	if cfg.SiteSalt == "" {
 		cfg.SiteSalt = "example.com"
 	}
 
-	if p := strings.TrimSpace(cfg.Storage.R2.Prefix); p != "" && !strings.HasSuffix(p, "/") {
-		cfg.Storage.R2.Prefix = p + "/"
+	if p := strings.TrimSpace(cfg.Storage.R2.Directory); p != "" {
+		cfg.Storage.R2.Directory = strings.Trim(p, "/")
 	}
+
+	cfg.Storage.R2.PublicBase = strings.TrimRight(strings.TrimSpace(cfg.Storage.R2.PublicBase), "/")
 }
 
 func validate(cfg Config) error {
 	switch cfg.Storage.Driver {
-	case "filesystem":
+	case "local":
 		// ok
 	case "r2":
 		r2 := cfg.Storage.R2
@@ -117,35 +93,28 @@ func validate(cfg Config) error {
 		if r2.SecretKey == "" {
 			return fmt.Errorf("r2: missing R2_SECRET_KEY")
 		}
+		if r2.PublicBase == "" {
+			return fmt.Errorf("r2: missing R2_PUBLIC_BASE")
+		}
+		if r2.Directory == "" {
+			return fmt.Errorf("r2: missing R2_DIRECTORY")
+		}
 	default:
 		return fmt.Errorf("invalid storage driver: %q", cfg.Storage.Driver)
 	}
 
-	switch cfg.DB.Driver {
-	case "memory":
+	switch cfg.API.Mode {
+	case "fake":
 		return nil
-	case "mysql":
-		m := cfg.DB.MySQL
-		if m.Host == "" {
-			return fmt.Errorf("mysql: missing MYSQL_HOST")
+	case "remote":
+		if strings.TrimSpace(cfg.API.Endpoint) == "" {
+			return fmt.Errorf("api: missing API_ENDPOINT")
 		}
-		if m.Port == 0 {
-			return fmt.Errorf("mysql: missing MYSQL_PORT")
-		}
-		if m.Username == "" {
-			return fmt.Errorf("mysql: missing MYSQL_USERNAME")
-		}
-		if m.Password == "" {
-			return fmt.Errorf("mysql: missing MYSQL_PASSWORD")
-		}
-		if m.Database == "" {
-			return fmt.Errorf("mysql: missing MYSQL_DATABASE")
-		}
-		if m.UserDatabase == "" {
-			return fmt.Errorf("mysql: missing MYSQL_USER_DATABASE")
+		if strings.TrimSpace(cfg.API.SecretKey) == "" {
+			return fmt.Errorf("api: missing API_SECRET_KEY")
 		}
 		return nil
 	default:
-		return fmt.Errorf("invalid db driver: %q", cfg.DB.Driver)
+		return fmt.Errorf("invalid api mode: %q", cfg.API.Mode)
 	}
 }

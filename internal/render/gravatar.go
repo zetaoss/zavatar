@@ -2,12 +2,29 @@
 package render
 
 import (
-	"fmt"
+	"net/url"
+	"regexp"
+	"strconv"
+	"strings"
 )
 
+var reMD5 = regexp.MustCompile(`^[a-f0-9]{32}$`)
+
+func ValidGHash(s string) bool {
+	s = strings.TrimSpace(strings.ToLower(s))
+	return reMD5.MatchString(s)
+}
+
 func GravatarURL(ghash string, size int) string {
-	if size < 1 {
-		size = 1
+	ghash = strings.TrimSpace(strings.ToLower(ghash))
+	u := url.URL{
+		Scheme: "https",
+		Host:   "www.gravatar.com",
+		Path:   "/avatar/" + ghash,
 	}
-	return fmt.Sprintf("https://www.gravatar.com/avatar/%s?s=%d", ghash, size)
+	q := u.Query()
+	q.Set("s", strconv.Itoa(size))
+	q.Set("d", "404")
+	u.RawQuery = q.Encode()
+	return u.String()
 }

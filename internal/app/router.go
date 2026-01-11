@@ -11,7 +11,7 @@ import (
 	"github.com/zetaoss/zavatar/internal/zlog"
 )
 
-func router(avatarH *handler.AvatarHandler, internalH *handler.InternalHandler) http.Handler {
+func router(avatarH *handler.AvatarHandler, enableLocalStatic bool) http.Handler {
 	r := chi.NewRouter()
 
 	r.Use(middleware.RequestID)
@@ -24,9 +24,10 @@ func router(avatarH *handler.AvatarHandler, internalH *handler.InternalHandler) 
 
 	r.Get("/u/{user_id}", avatarH.GetAvatar)
 
-	r.Route("/internal", func(r chi.Router) {
-		r.Post("/purge/u/{user_id}", internalH.PurgeAvatar)
-	})
+	if enableLocalStatic {
+		fs := http.FileServer(http.Dir("./bucket"))
+		r.NotFound(fs.ServeHTTP)
+	}
 
 	return r
 }

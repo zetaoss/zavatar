@@ -2,44 +2,28 @@
 package config
 
 type Config struct {
-	Addr        string // env: ADDR
-	BaseURL     string // env: BASE_URL
-	InternalKey string // env: INTERNAL_KEY
-	SiteSalt    string // env: SITE_SALT
-
-	Cloudflare CloudflareConfig
-	Storage    StorageConfig
-	DB         DBConfig
-}
-
-type CloudflareConfig struct {
-	ZoneID   string // env: CF_ZONE_ID
-	APIToken string // env: CF_API_TOKEN
+	Addr     string
+	SiteSalt string
+	Storage  StorageConfig
+	API      APIConfig
 }
 
 type StorageConfig struct {
-	Driver string // filesystem | r2
+	Driver string
 	R2     R2Config
 }
 
 type R2Config struct {
-	AccountID string
-	Bucket    string
-	AccessKey string
+	Bucket     string
+	AccountID  string
+	AccessKey  string
+	SecretKey  string
+	Directory  string
+	PublicBase string
+}
+
+type APIConfig struct {
+	Mode      string
+	Endpoint  string
 	SecretKey string
-	Prefix    string
-}
-
-type DBConfig struct {
-	Driver string // memory | mysql
-	MySQL  MySQLConfig
-}
-
-type MySQLConfig struct {
-	Host         string
-	Port         int
-	Username     string
-	Password     string
-	Database     string
-	UserDatabase string
 }
