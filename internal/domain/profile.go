@@ -41,3 +41,14 @@ func AvatarTypeFromCode(code AvatarTypeCode) AvatarType {
 		return AvatarTypeIdenticon
 	}
 }
+
+func AvatarTypeToCode(t AvatarType) AvatarTypeCode {
+	switch NormalizeAvatarType(t) {
+	case AvatarTypeLetter:
+		return AvatarTypeCodeLetter
+	case AvatarTypeGravatar:
+		return AvatarTypeCodeGravatar
+	default:
+		return AvatarTypeCodeIdenticon
+	}
+}

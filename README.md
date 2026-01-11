@@ -9,7 +9,7 @@ It exposes a single, stable avatar endpoint and internally selects the optimal s
 
 ## Avatar Types
 
-The avatar type is explicitly selected using the `t` parameter.
+The avatar type is selected by `t` when provided. When `t` is omitted, the service uses the user's profile type from the API.
 
 | t | Type        | Description |
 |---|-------------|------------|
@@ -17,8 +17,8 @@ The avatar type is explicitly selected using the `t` parameter.
 | 2 | `initials`   | Initials avatar derived from `user_name` |
 | 3 | `gravatar` | External Gravatar avatar (redirected) |
 
-- `t` is **always required**
-- User-related data such as `user_name` or `ghash` is resolved internally from the database
+- `t` is optional; omit it for the default profile type
+- User-related data such as `user_name` is resolved internally from the API
 
 ---
 
@@ -45,7 +45,7 @@ GET /u/{uid}?s={size}&t={type}
 |----------|----------|-------------|
 | `uid` | yes | User ID |
 | `s` | no | Avatar size |
-| `t` | yes | Avatar type (`1`, `2`, or `3`) |
+| `t` | no | Avatar type (`1`, `2`, or `3`) |
 
 ---
 
@@ -128,6 +128,9 @@ API_SECRET_KEY=xxxx
 
 # initials
 /u/1?s=64&t=2
+
+# default type from API (t omitted)
+/u/3?s=128
 
 # gravatar (redirect or fallback)
 /u/3?s=128&t=3

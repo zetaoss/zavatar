@@ -57,7 +57,7 @@ func (s *AvatarService) Resolve(ctx context.Context, in ResolveInput) (*ResolveO
 	}
 
 	tCode := domain.AvatarTypeCode(in.T)
-	if in.T < 1 || in.T > 3 {
+	if in.T != 0 && (in.T < 1 || in.T > 3) {
 		return nil, ErrBadParams
 	}
 
@@ -74,6 +74,10 @@ func (s *AvatarService) Resolve(ctx context.Context, in ResolveInput) (*ResolveO
 	sfKey := fmt.Sprintf("uid=%d|s=%d|t=%d", in.UserID, sizeEff, in.T)
 
 	v, err, _ := s.sf.Do(sfKey, func() (any, error) {
+		if tCode == 0 {
+			tCode = domain.AvatarTypeToCode(prof.Type)
+		}
+
 		switch tCode {
 		case domain.AvatarTypeCodeGravatar:
 			return s.resolveGravatar(ctx, prof, in.UserID, sizeEff)
@@ -102,7 +106,7 @@ func (s *AvatarService) resolveGravatar(ctx context.Context, prof *domain.UserPr
 	log := zlog.Ctx(ctx)
 
 	gh := strings.ToLower(strings.TrimSpace(prof.GHash))
-	if gh != "" && render.ValidGHash(gh) {
+	if gh != "" {
 		return &ResolveOutput{
 			RedirectURL:  render.GravatarURL(gh, size),
 			CacheControl: cacheUnstable,
@@ -111,8 +115,6 @@ func (s *AvatarService) resolveGravatar(ctx context.Context, prof *domain.UserPr
 
 	if gh == "" {
 		log.Info("missing ghash, fallback to identicon", "uid", userID, "s", size)
-	} else {
-		log.Warn("invalid ghash, fallback to identicon", "uid", userID, "s", size, "ghash", gh)
 	}
 
 	return s.resolveStored(ctx, prof, userID, size, domain.AvatarTypeCodeIdenticon)

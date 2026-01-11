@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/patrickmn/go-cache"
 	"github.com/zetaoss/zavatar/internal/domain"
 )
 
@@ -21,6 +22,7 @@ type API struct {
 	endpoint  string
 	secretKey string
 	client    *http.Client
+	cache     *cache.Cache
 }
 
 func New(endpoint, secretKey string) *API {
@@ -28,12 +30,24 @@ func New(endpoint, secretKey string) *API {
 		endpoint:  strings.TrimRight(endpoint, "/"),
 		secretKey: secretKey,
 		client:    &http.Client{Timeout: 5 * time.Second},
+		cache:     cache.New(5*time.Minute, 10*time.Minute),
 	}
 }
 
 func (a *API) Get(ctx context.Context, userID int64) (*domain.UserProfile, error) {
 	if a.endpoint == "" {
 		return nil, errors.New("remote: missing endpoint")
+	}
+
+	cacheKey := fmt.Sprintf("%d", userID)
+	if v, ok := a.cache.Get(cacheKey); ok {
+		if v == nil {
+			return nil, nil
+		}
+		if cached, ok := v.(*domain.UserProfile); ok && cached != nil {
+			cp := *cached
+			return &cp, nil
+		}
 	}
 
 	url := fmt.Sprintf("%s/api/internal/profiles/%d", a.endpoint, userID)
@@ -61,6 +75,7 @@ func (a *API) Get(ctx context.Context, userID int64) (*domain.UserProfile, error
 		slog.Debug("remote api response", "status", resp.StatusCode, "user_id", userID)
 	case http.StatusNotFound:
 		slog.Debug("remote api not found", "status", resp.StatusCode, "user_id", userID)
+		a.cache.Set(cacheKey, nil, cache.DefaultExpiration)
 		return nil, nil
 	default:
 		slog.Warn("remote api unexpected status", "status", resp.StatusCode, "user_id", userID)
@@ -76,11 +91,14 @@ func (a *API) Get(ctx context.Context, userID int64) (*domain.UserProfile, error
 		return nil, err
 	}
 
-	return &domain.UserProfile{
+	prof := &domain.UserProfile{
 		Name:  payload.Name,
 		Type:  domain.AvatarTypeFromCode(domain.AvatarTypeCode(payload.Type)),
 		GHash: payload.GHash,
-	}, nil
+	}
+	a.cache.Set(cacheKey, prof, cache.DefaultExpiration)
+
+	return prof, nil
 }
 
 func (a *API) sign(method, path, query, timestamp string) string {

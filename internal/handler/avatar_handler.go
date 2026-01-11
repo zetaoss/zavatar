@@ -35,14 +35,13 @@ func (h *AvatarHandler) GetAvatar(w http.ResponseWriter, r *http.Request) {
 	sizeEff := domain.NormalizeSizeQuery(q.Get("s"))
 
 	tStr := q.Get("t")
-	if tStr == "" {
-		http.Error(w, "missing t", http.StatusBadRequest)
-		return
-	}
-	t, err := strconv.Atoi(tStr)
-	if err != nil || t < 1 || t > 2 {
-		http.Error(w, "bad params", http.StatusBadRequest)
-		return
+	t := 0
+	if tStr != "" {
+		t, err = strconv.Atoi(tStr)
+		if err != nil || t < 1 || t > 3 {
+			http.Error(w, "bad params", http.StatusBadRequest)
+			return
+		}
 	}
 
 	log := zlog.Ctx(r.Context()).With("uid", uid, "s", sizeEff, "t", t)
