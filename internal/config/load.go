@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/peterbourgon/ff/v3"
 )
@@ -14,6 +15,8 @@ func Load(args []string) (Config, error) {
 
 	addr := fs.String("addr", ":8080", "listen address, e.g. :8080 (env: ADDR)")
 	siteSalt := fs.String("site-salt", "example.com", "avatar site salt (env: SITE_SALT)")
+	resolveMaxAge := fs.Int("resolve-max-age", 60, "env: RESOLVE_MAX_AGE")
+	resolveSMaxAge := fs.Int("resolve-s-maxage", 3600, "env: RESOLVE_S_MAXAGE")
 
 	storageDriver := fs.String("storage-driver", "local", "storage driver: local|r2 (env: STORAGE_DRIVER)")
 	apiMode := fs.String("api-mode", "fake", "api mode: fake|remote (env: API_MODE)")
@@ -27,14 +30,19 @@ func Load(args []string) (Config, error) {
 
 	apiEndpoint := fs.String("api-endpoint", "", "env: API_ENDPOINT")
 	apiSecretKey := fs.String("api-secret-key", "", "env: API_SECRET_KEY")
+	apiCacheEnabled := fs.Bool("api-cache-enabled", true, "env: API_CACHE_ENABLED")
+	apiCacheDefaultExpiration := fs.Duration("api-cache-default-expiration", 5*time.Minute, "env: API_CACHE_DEFAULT_EXPIRATION")
+	apiCacheCleanupInterval := fs.Duration("api-cache-cleanup-interval", 10*time.Minute, "env: API_CACHE_CLEANUP_INTERVAL")
 
 	if err := ff.Parse(fs, args, ff.WithEnvVars()); err != nil {
 		return Config{}, err
 	}
 
 	cfg := Config{
-		Addr:     strings.TrimSpace(*addr),
-		SiteSalt: strings.TrimSpace(*siteSalt),
+		Addr:           strings.TrimSpace(*addr),
+		SiteSalt:       strings.TrimSpace(*siteSalt),
+		ResolveMaxAge:  *resolveMaxAge,
+		ResolveSMaxAge: *resolveSMaxAge,
 		Storage: StorageConfig{
 			Driver: strings.TrimSpace(*storageDriver),
 			R2: R2Config{
@@ -47,9 +55,12 @@ func Load(args []string) (Config, error) {
 			},
 		},
 		API: APIConfig{
-			Mode:      strings.TrimSpace(*apiMode),
-			Endpoint:  strings.TrimSpace(*apiEndpoint),
-			SecretKey: strings.TrimSpace(*apiSecretKey),
+			Mode:                   strings.TrimSpace(*apiMode),
+			Endpoint:               strings.TrimSpace(*apiEndpoint),
+			SecretKey:              strings.TrimSpace(*apiSecretKey),
+			CacheEnabled:           *apiCacheEnabled,
+			CacheDefaultExpiration: *apiCacheDefaultExpiration,
+			CacheCleanupInterval:   *apiCacheCleanupInterval,
 		},
 	}
 
@@ -76,6 +87,13 @@ func normalize(cfg *Config) {
 }
 
 func validate(cfg Config) error {
+	if cfg.ResolveMaxAge <= 0 {
+		return fmt.Errorf("invalid resolve max age: %d", cfg.ResolveMaxAge)
+	}
+	if cfg.ResolveSMaxAge <= 0 {
+		return fmt.Errorf("invalid resolve s-maxage: %d", cfg.ResolveSMaxAge)
+	}
+
 	switch cfg.Storage.Driver {
 	case "local":
 		// ok
@@ -112,6 +130,14 @@ func validate(cfg Config) error {
 		}
 		if strings.TrimSpace(cfg.API.SecretKey) == "" {
 			return fmt.Errorf("api: missing API_SECRET_KEY")
+		}
+		if cfg.API.CacheEnabled {
+			if cfg.API.CacheDefaultExpiration <= 0 {
+				return fmt.Errorf("api: invalid API_CACHE_DEFAULT_EXPIRATION")
+			}
+			if cfg.API.CacheCleanupInterval <= 0 {
+				return fmt.Errorf("api: invalid API_CACHE_CLEANUP_INTERVAL")
+			}
 		}
 		return nil
 	default:

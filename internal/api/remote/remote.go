@@ -25,12 +25,17 @@ type API struct {
 	cache     *cache.Cache
 }
 
-func New(endpoint, secretKey string) *API {
+func New(endpoint, secretKey string, cacheEnabled bool, cacheDefaultExpiration, cacheCleanupInterval time.Duration) *API {
+	var apiCache *cache.Cache
+	if cacheEnabled {
+		apiCache = cache.New(cacheDefaultExpiration, cacheCleanupInterval)
+	}
+
 	return &API{
 		endpoint:  strings.TrimRight(endpoint, "/"),
 		secretKey: secretKey,
 		client:    &http.Client{Timeout: 5 * time.Second},
-		cache:     cache.New(5*time.Minute, 10*time.Minute),
+		cache:     apiCache,
 	}
 }
 
@@ -40,13 +45,15 @@ func (a *API) Get(ctx context.Context, userID int64) (*domain.UserProfile, error
 	}
 
 	cacheKey := fmt.Sprintf("%d", userID)
-	if v, ok := a.cache.Get(cacheKey); ok {
-		if v == nil {
-			return nil, nil
-		}
-		if cached, ok := v.(*domain.UserProfile); ok && cached != nil {
-			cp := *cached
-			return &cp, nil
+	if a.cache != nil {
+		if v, ok := a.cache.Get(cacheKey); ok {
+			if v == nil {
+				return nil, nil
+			}
+			if cached, ok := v.(*domain.UserProfile); ok && cached != nil {
+				cp := *cached
+				return &cp, nil
+			}
 		}
 	}
 
@@ -75,7 +82,9 @@ func (a *API) Get(ctx context.Context, userID int64) (*domain.UserProfile, error
 		slog.Debug("remote api response", "status", resp.StatusCode, "user_id", userID)
 	case http.StatusNotFound:
 		slog.Debug("remote api not found", "status", resp.StatusCode, "user_id", userID)
-		a.cache.Set(cacheKey, nil, cache.DefaultExpiration)
+		if a.cache != nil {
+			a.cache.Set(cacheKey, nil, cache.DefaultExpiration)
+		}
 		return nil, nil
 	default:
 		slog.Warn("remote api unexpected status", "status", resp.StatusCode, "user_id", userID)
@@ -96,7 +105,9 @@ func (a *API) Get(ctx context.Context, userID int64) (*domain.UserProfile, error
 		Type:  domain.AvatarTypeFromCode(domain.AvatarTypeCode(payload.Type)),
 		GHash: payload.GHash,
 	}
-	a.cache.Set(cacheKey, prof, cache.DefaultExpiration)
+	if a.cache != nil {
+		a.cache.Set(cacheKey, prof, cache.DefaultExpiration)
+	}
 
 	return prof, nil
 }

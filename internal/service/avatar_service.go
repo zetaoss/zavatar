@@ -16,25 +16,22 @@ import (
 	"github.com/zetaoss/zavatar/internal/zlog"
 )
 
-const (
-	cacheImmutable = "public, max-age=31536000, immutable"
-	cacheUnstable  = "public, max-age=300"
-)
-
 type AvatarService struct {
-	storage  storage.Storage
-	api      api.API
-	siteSalt string
-	prefix   string
-	sf       singleflight.Group
+	storage      storage.Storage
+	api          api.API
+	siteSalt     string
+	prefix       string
+	cacheControl string
+	sf           singleflight.Group
 }
 
-func NewAvatarService(st storage.Storage, a api.API, siteSalt string, prefix string) *AvatarService {
+func NewAvatarService(st storage.Storage, a api.API, siteSalt string, prefix string, resolveMaxAge, resolveSMaxAge int) *AvatarService {
 	return &AvatarService{
-		storage:  st,
-		api:      a,
-		siteSalt: siteSalt,
-		prefix:   prefix,
+		storage:      st,
+		api:          a,
+		siteSalt:     siteSalt,
+		prefix:       prefix,
+		cacheControl: fmt.Sprintf("public, max-age=%d, s-maxage=%d", resolveMaxAge, resolveSMaxAge),
 	}
 }
 
@@ -109,7 +106,7 @@ func (s *AvatarService) resolveGravatar(ctx context.Context, prof *domain.UserPr
 	if gh != "" {
 		return &ResolveOutput{
 			RedirectURL:  render.GravatarURL(gh, size),
-			CacheControl: cacheUnstable,
+			CacheControl: s.cacheControl,
 		}, nil
 	}
 
@@ -149,7 +146,7 @@ func (s *AvatarService) resolveStored(ctx context.Context, prof *domain.UserProf
 
 	return &ResolveOutput{
 		RedirectURL:  url,
-		CacheControl: cacheImmutable,
+		CacheControl: s.cacheControl,
 	}, nil
 }
 
