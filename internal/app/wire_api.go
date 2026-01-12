@@ -11,7 +11,13 @@ import (
 func wireAPI(cfg config.APIConfig) (api.API, error) {
 	switch cfg.Mode {
 	case "remote":
-		return remote.New(cfg.Endpoint, cfg.SecretKey), nil
+		return remote.New(
+			cfg.Endpoint,
+			cfg.SecretKey,
+			cfg.CacheEnabled,
+			cfg.CacheDefaultExpiration,
+			cfg.CacheCleanupInterval,
+		), nil
 
 	default: // fake
 		return fake.New(), nil

@@ -1,11 +1,15 @@
 // internal/config/config.go
 package config
 
+import "time"
+
 type Config struct {
-	Addr     string
-	SiteSalt string
-	Storage  StorageConfig
-	API      APIConfig
+	Addr           string
+	SiteSalt       string
+	ResolveMaxAge  int
+	ResolveSMaxAge int
+	Storage        StorageConfig
+	API            APIConfig
 }
 
 type StorageConfig struct {
@@ -23,7 +27,10 @@ type R2Config struct {
 }
 
 type APIConfig struct {
-	Mode      string
-	Endpoint  string
-	SecretKey string
+	Mode                   string
+	Endpoint               string
+	SecretKey              string
+	CacheEnabled           bool
+	CacheDefaultExpiration time.Duration
+	CacheCleanupInterval   time.Duration
 }

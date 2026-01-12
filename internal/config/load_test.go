@@ -3,6 +3,7 @@ package config
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -13,9 +14,14 @@ func TestLoad_Defaults(t *testing.T) {
 
 	require.Equal(t, ":8080", cfg.Addr)
 	require.Equal(t, "example.com", cfg.SiteSalt)
+	require.Equal(t, 60, cfg.ResolveMaxAge)
+	require.Equal(t, 3600, cfg.ResolveSMaxAge)
 
 	require.Equal(t, "local", cfg.Storage.Driver)
 	require.Equal(t, "fake", cfg.API.Mode)
+	require.True(t, cfg.API.CacheEnabled)
+	require.Equal(t, 5*time.Minute, cfg.API.CacheDefaultExpiration)
+	require.Equal(t, 10*time.Minute, cfg.API.CacheCleanupInterval)
 }
 
 func TestLoad_TrimsAndNormalizes(t *testing.T) {

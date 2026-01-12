@@ -43,7 +43,14 @@ func Run(c Config) error {
 		return err
 	}
 
-	avatarSvc := service.NewAvatarService(st.St, apiClient, cfg.SiteSalt, st.Prefix)
+	avatarSvc := service.NewAvatarService(
+		st.St,
+		apiClient,
+		cfg.SiteSalt,
+		st.Prefix,
+		cfg.ResolveMaxAge,
+		cfg.ResolveSMaxAge,
+	)
 	avatarH := handler.NewAvatarHandler(avatarSvc)
 	h := router(avatarH, st.EnableLocalStatic)
 
