@@ -22,21 +22,17 @@ curl:
 	@echo " zavatar local test URLs (curl)"
 	@echo "=========================================="
 	@echo ""
-	@echo "identicon (uid=1, s=40)"
-	@echo "  url: http://localhost:8080/u/1?s=40&t=1"
-	@curl -s -o /dev/null -D - "http://localhost:8080/u/1?s=40&t=1" | grep -i -E '^HTTP/|^Location:'
+	@echo "  url: http://localhost:8080/u/1?s=40"
+	@curl -s -o /dev/null -D - "http://localhost:8080/u/1?s=40" | grep -i -E '^HTTP/|^Location:'
 	@echo ""
-	@echo "letter (uid=2, s=200)"
-	@echo "  url: http://localhost:8080/u/2?s=200&t=2"
-	@curl -s -o /dev/null -D - "http://localhost:8080/u/2?s=200&t=2" | grep -i -E '^HTTP/|^Location:'
+	@echo "  url: http://localhost:8080/u/2?s=200"
+	@curl -s -o /dev/null -D - "http://localhost:8080/u/2?s=200" | grep -i -E '^HTTP/|^Location:'
 	@echo ""
-	@echo "identicon large (uid=3, s=320)"
-	@echo "  url: http://localhost:8080/u/3?s=320&t=1"
-	@curl -s -o /dev/null -D - "http://localhost:8080/u/3?s=320&t=1" | grep -i -E '^HTTP/|^Location:'
+	@echo "  url: http://localhost:8080/u/11?s=320"
+	@curl -s -o /dev/null -D - "http://localhost:8080/u/11?s=320" | grep -i -E '^HTTP/|^Location:'
 	@echo ""
-	@echo "missing user (uid=9999999999, s=40)"
-	@echo "  url: http://localhost:8080/u/9999999999?s=40&t=1"
-	@curl -s -o /dev/null -D - "http://localhost:8080/u/9999999999?s=40&t=1" | grep -i -E '^HTTP/|^Location:'
+	@echo "  url: http://localhost:8080/u/9999999999?s=40"
+	@curl -s -o /dev/null -D - "http://localhost:8080/u/9999999999?s=40" | grep -i -E '^HTTP/|^Location:'
 
 .PHONY: lint
 lint: lint-install
