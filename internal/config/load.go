@@ -133,10 +133,10 @@ func validate(cfg Config) error {
 		}
 		if cfg.API.CacheEnabled {
 			if cfg.API.CacheDefaultExpiration <= 0 {
-				return fmt.Errorf("api: invalid API_CACHE_DEFAULT_EXPIRATION")
+				return fmt.Errorf("api: invalid API_CACHE_DEFAULT_EXPIRATION: %v", cfg.API.CacheDefaultExpiration)
 			}
 			if cfg.API.CacheCleanupInterval <= 0 {
-				return fmt.Errorf("api: invalid API_CACHE_CLEANUP_INTERVAL")
+				return fmt.Errorf("api: invalid API_CACHE_CLEANUP_INTERVAL: %v", cfg.API.CacheCleanupInterval)
 			}
 		}
 		return nil
