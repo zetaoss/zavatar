@@ -5,9 +5,9 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
-ARG VERSION=dev
+ARG VERSION
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
-    go build -ldflags "-s -w -X github.com/zetaoss/zavatar/cmd/zavatar.Version=${VERSION}" \
+    go build -ldflags "-s -w -X main.Version=${VERSION}" \
     -o /out/zavatar ./cmd/zavatar
 
 FROM gcr.io/distroless/base-debian12:nonroot
