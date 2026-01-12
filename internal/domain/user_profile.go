@@ -1,4 +1,4 @@
-// internal/domain/profile.go
+// internal/domain/user_profile.go
 package domain
 
 type AvatarType string

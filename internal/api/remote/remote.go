@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -70,7 +71,6 @@ func (a *API) Get(ctx context.Context, userID int64) (*domain.UserProfile, error
 	}
 
 	url := fmt.Sprintf("%s/api/internal/profiles/%d", a.endpoint, userID)
-	slog.Debug("remote api get", "userID", userID, "url", url)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -84,40 +84,49 @@ func (a *API) Get(ctx context.Context, userID int64) (*domain.UserProfile, error
 
 	resp, err := a.client.Do(req)
 	if err != nil {
-		slog.Warn("remote api request failed", "err", err, "user_id", userID)
+		slog.Warn("GET failed", "userID", userID, "err", err)
 		return nil, err
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	switch resp.StatusCode {
 	case http.StatusOK:
-		slog.Debug("remote api response", "status", resp.StatusCode, "user_id", userID)
 	case http.StatusNotFound:
-		slog.Debug("remote api not found", "status", resp.StatusCode, "user_id", userID)
+		slog.Debug("remote profile not found", "userID", userID, "status", resp.StatusCode)
 		a.cacheSet(cacheKey, nil, cache.DefaultExpiration)
 		return nil, nil
 	default:
-		slog.Warn("remote api unexpected status", "status", resp.StatusCode, "user_id", userID)
+		slog.Warn("remote unexpected status", "userID", userID, "status", resp.StatusCode)
 		return nil, fmt.Errorf("remote: unexpected status %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		slog.Warn("remote read body failed", "userID", userID, "status", resp.StatusCode, "err", err)
+		return nil, err
 	}
 
 	var payload struct {
 		Name  string `json:"name"`
-		Type  int    `json:"type"`
+		T     int    `json:"t"`
 		GHash string `json:"ghash"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+	if err := json.Unmarshal(body, &payload); err != nil {
+		slog.Warn("remote unmarshal failed", "userID", userID, "status", resp.StatusCode, "body", string(body), "err", err)
 		return nil, err
 	}
 
-	prof := &domain.UserProfile{
+	prof := domain.UserProfile{
 		Name:  payload.Name,
-		Type:  domain.AvatarTypeFromCode(domain.AvatarTypeCode(payload.Type)),
+		Type:  domain.AvatarTypeFromCode(domain.AvatarTypeCode(payload.T)),
 		GHash: payload.GHash,
 	}
-	a.cacheSet(cacheKey, prof, cache.DefaultExpiration)
 
-	return prof, nil
+	slog.Debug("remote profile received", "userID", userID, "status", resp.StatusCode, "profile", payload)
+
+	a.cacheSet(cacheKey, &prof, cache.DefaultExpiration)
+
+	return &prof, nil
 }
 
 func (a *API) sign(method, path, query, timestamp string) string {
