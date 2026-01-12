@@ -92,17 +92,17 @@ func (a *API) Get(ctx context.Context, userID int64) (*domain.UserProfile, error
 	switch resp.StatusCode {
 	case http.StatusOK:
 	case http.StatusNotFound:
-		slog.Debug(fmt.Sprintf("profiles/%d [%d]", userID, resp.StatusCode))
+		slog.Debug("remote profile not found", "userID", userID, "status", resp.StatusCode)
 		a.cacheSet(cacheKey, nil, cache.DefaultExpiration)
 		return nil, nil
 	default:
-		slog.Warn(fmt.Sprintf("profiles/%d [%d]", userID, resp.StatusCode))
+		slog.Warn("remote unexpected status", "userID", userID, "status", resp.StatusCode)
 		return nil, fmt.Errorf("remote: unexpected status %d", resp.StatusCode)
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		slog.Warn(fmt.Sprintf("profiles/%d [%d]", userID, resp.StatusCode), "err", err)
+		slog.Warn("remote read body failed", "userID", userID, "status", resp.StatusCode, "err", err)
 		return nil, err
 	}
 
@@ -112,7 +112,7 @@ func (a *API) Get(ctx context.Context, userID int64) (*domain.UserProfile, error
 		GHash string `json:"ghash"`
 	}
 	if err := json.Unmarshal(body, &payload); err != nil {
-		slog.Warn("unmarshal failed", "err", err)
+		slog.Warn("remote unmarshal failed", "userID", userID, "status", resp.StatusCode, "body", string(body), "err", err)
 		return nil, err
 	}
 
@@ -122,7 +122,7 @@ func (a *API) Get(ctx context.Context, userID int64) (*domain.UserProfile, error
 		GHash: payload.GHash,
 	}
 
-	slog.Debug(fmt.Sprintf("profiles/%d [%d] %+v", userID, resp.StatusCode, payload))
+	slog.Debug("remote profile received", "userID", userID, "status", resp.StatusCode, "profile", payload)
 
 	a.cacheSet(cacheKey, &prof, cache.DefaultExpiration)
 
